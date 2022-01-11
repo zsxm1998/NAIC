@@ -1,5 +1,5 @@
-info: 第一次训练
-device: 1
+info: 重建损失由L2Loss换成MSELoss
+device: 0
 epochs: 1000
 early_stopping: false
 batch_size: 512

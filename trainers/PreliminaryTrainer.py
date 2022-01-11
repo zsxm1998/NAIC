@@ -53,7 +53,7 @@ class PreliminaryTrainer(BaseTrainer):
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
 
         self.criterion_c = SupConLoss()
-        self.criterion_r = L2ReconstructionLoss()
+        self.criterion_r = nn.MSELoss()
 
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp
