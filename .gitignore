@@ -1,6 +1,6 @@
 *.ipynb_checkpoints
 /.vscode
-/details
+/.details
 *__pycache__
 *.png
 Arial.ttf

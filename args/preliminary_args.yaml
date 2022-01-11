@@ -1,0 +1,9 @@
+info: 第一次训练
+device: 1
+epochs: 1000
+early_stopping: false
+batch_size: 512
+lr: 0.1
+source: /nfs3-p2/zsxm/naic/preliminary/train/
+save_cp: false
+load_model: false

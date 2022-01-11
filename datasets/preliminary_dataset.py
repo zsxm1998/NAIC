@@ -9,8 +9,9 @@ import torch
 from torch.utils.data import Dataset, Sampler
 
 class PreliminaryDataset(Dataset):
-    def __init__(self, dir):
+    def __init__(self, dir, memory=True):
         self.file_dir = join(dir, 'train_feature')
+        self.memory = memory
         self.datas = {}
         with open(join(dir, 'train_list.txt'), 'r') as f:
             while True:
@@ -19,6 +20,7 @@ class PreliminaryDataset(Dataset):
                 line = line.strip()
                 elems = line.split(' ')
                 self.datas.setdefault(int(elems[1]), []).append(elems[0])
+        self.instance_len = len(self.datas)
         self.len_idx_sets, self.idx2len = {}, {}
         self.q_len, self.max_len = 0, -1
         for k, v in self.datas.items():
@@ -27,18 +29,31 @@ class PreliminaryDataset(Dataset):
             self.idx2len[k] = l
             self.q_len += l
             self.max_len = max(self.max_len, l)
+        if memory:
+            database_list = []
+            self.file2idx = {}
+            for i, data in enumerate(sorted(os.listdir(self.file_dir))):
+                database_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, data), dtype='<f4')))
+                self.file2idx[data] = i
+            self.database = torch.stack(database_list)
 
     def __len__(self):
-        return len(self.datas)
+        return self.q_len
 
     def __getitem__(self, index):
         q_file_list = random.sample(self.datas[index], len(self.datas[index])//2)
         k_file_list = [f for f in self.datas[index] if f not in q_file_list]
         q_list, k_list = [], []
         for q_file in q_file_list:
-            q_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, q_file), dtype='<f4')))
+            if self.memory:
+                q_list.append(self.database[self.file2idx[q_file]])
+            else:
+                q_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, q_file), dtype='<f4')))
         for k_file in k_file_list:
-            k_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, k_file), dtype='<f4')))
+            if self.memory:
+                k_list.append(self.database[self.file2idx[k_file]])
+            else:
+                k_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, k_file), dtype='<f4')))
         return q_list, k_list, torch.tensor(index, dtype=torch.long)
 
 
@@ -51,7 +66,7 @@ class PreliminaryBatchSampler(Sampler[List[int]]):
     def __iter__(self):
         min_batch_num = self.dataset.q_len // self.batch_size
         batch_num = 0
-        index_list = list(range(len(self.dataset)))
+        index_list = list(range(self.dataset.instance_len))
         random.shuffle(index_list)
         len_idx_sets = copy.deepcopy(self.dataset.len_idx_sets)
         len_list = sorted(list(len_idx_sets.keys()), reverse=True)
@@ -113,4 +128,12 @@ class PreliminaryBatchSampler(Sampler[List[int]]):
 
 
 def preliminary_collate_fn(input_list): #[(q_list, k_list, label), (q_list, k_list, label)...]
-    q
+    q_label_list, k_label_list = [], []
+    q_list, k_list = [], []
+    for input in input_list:
+        q_label, k_label = input[2].repeat(len(input[0])), input[2].repeat(len(input[1]))
+        q_label_list.append(q_label)
+        k_label_list.append(k_label)
+        q_list.extend(input[0])
+        k_list.extend(input[1])
+    return torch.stack(q_list), torch.stack(k_list), torch.cat(q_label_list), torch.cat(k_label_list)
