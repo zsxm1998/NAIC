@@ -13,7 +13,7 @@ from trainers.BaseTrainer import BaseTrainer
 from datasets.preliminary_dataset import PreliminaryDataset, PreliminaryBatchSampler, preliminary_collate_fn
 from models.mlp import MLP_MoCo
 from losses.supcon import SupConLoss
-from losses.reconstruction import L2ReconstructionLoss
+from losses.reconstruction import L2ReconstructionLoss, ExpReconstructionLoss
 
 class PreliminaryTrainer(BaseTrainer):
     def __init__(self, opt_file='args/preliminary_args.yaml'):
@@ -41,7 +41,7 @@ class PreliminaryTrainer(BaseTrainer):
             self.logger.info(f'Model loaded from {opt.load_model}')
         self.net.to(device=self.device)
 
-        self.train_dataset = PreliminaryDataset(opt.source, memory=True)
+        self.train_dataset = PreliminaryDataset(opt.source, memory=False)
         self.n_train = len(self.train_dataset)
         self.train_loader = DataLoader(self.train_dataset,
                                        batch_sampler=PreliminaryBatchSampler(self.train_dataset, opt.batch_size),
@@ -86,7 +86,7 @@ class PreliminaryTrainer(BaseTrainer):
                         q, k, queue, queue_label, reconstruct_q, reconstruct_k = self.net(in_q, in_k, k_label)
                         k, k_label = torch.cat([k, queue]), torch.cat([k_label, queue_label])
 
-                        c_loss = self.criterion_c(q, q_label, k, k_label)
+                        c_loss = torch.zeros(1).to(self.device)#self.criterion_c(q, q_label, k, k_label)
                         r_loss = self.criterion_r(reconstruct_q, in_q)
                         loss = c_loss + r_loss
                         self.writer.add_scalar('Train_Loss/contrastive_loss', c_loss.item(), global_step)
@@ -99,7 +99,7 @@ class PreliminaryTrainer(BaseTrainer):
 
                         self.optimizer.zero_grad()
                         loss.backward()
-                        nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
+                        #nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
                         self.optimizer.step()
 
                         pbar.update(in_q.shape[0])

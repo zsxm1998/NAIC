@@ -1,4 +1,4 @@
-info: 重建损失由L2Loss换成MSELoss
+info: 只计算重构loss，减少模型层数
 device: 0
 epochs: 1000
 early_stopping: false
@@ -6,4 +6,4 @@ batch_size: 512
 lr: 0.1
 source: /nfs3-p2/zsxm/naic/preliminary/train/
 save_cp: false
-load_model: false
+load_model: False
