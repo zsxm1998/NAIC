@@ -18,3 +18,15 @@ class ExpReconstructionLoss(nn.Module):
 
     def forward(self, reconstructed, origin):
         return reconstructed.sub(origin).pow(2).exp().mean()
+
+
+class EnlargeReconstructionLoss(nn.Module):
+    def __init__(self):
+        super(EnlargeReconstructionLoss, self).__init__()
+        self.l2loss = nn.MSELoss()
+        self.EXP = 1/3
+
+    def forward(self, reconstructed, origin):
+        reconstructed = reconstructed.sign()*reconstructed.abs().pow(self.EXP)
+        origin = origin.sign()*origin.abs().pow(self.EXP)
+        return self.l2loss(reconstructed, origin)

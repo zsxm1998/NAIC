@@ -13,6 +13,10 @@ class PreliminaryDataset(Dataset):
         self.file_dir = join(dir, 'train_feature')
         self.memory = memory
         self.datas = {}
+        if os.path.exists(join(dir, 'not_zero_dim.pt')):
+            self.not_zero_dim = torch.load(join(dir, 'not_zero_dim.pt'))
+        else:
+            self.not_zero_dim = None
         with open(join(dir, 'train_list.txt'), 'r') as f:
             while True:
                 line = f.readline()
@@ -33,7 +37,10 @@ class PreliminaryDataset(Dataset):
             database_list = []
             self.file2idx = {}
             for i, data in enumerate(sorted(os.listdir(self.file_dir))):
-                database_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, data), dtype='<f4')))
+                v = torch.from_numpy(np.fromfile(join(self.file_dir, data), dtype='<f4'))
+                if self.not_zero_dim is not None:
+                    v = v[self.not_zero_dim]
+                database_list.append(v)
                 self.file2idx[data] = i
             self.database = torch.stack(database_list)
 
@@ -48,12 +55,18 @@ class PreliminaryDataset(Dataset):
             if self.memory:
                 q_list.append(self.database[self.file2idx[q_file]])
             else:
-                q_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, q_file), dtype='<f4')))
+                v = torch.from_numpy(np.fromfile(join(self.file_dir, q_file), dtype='<f4'))
+                if self.not_zero_dim is not None:
+                    v = v[self.not_zero_dim]
+                q_list.append(v)
         for k_file in k_file_list:
             if self.memory:
                 k_list.append(self.database[self.file2idx[k_file]])
             else:
-                k_list.append(torch.from_numpy(np.fromfile(join(self.file_dir, k_file), dtype='<f4')))
+                v = torch.from_numpy(np.fromfile(join(self.file_dir, k_file), dtype='<f4'))
+                if self.not_zero_dim is not None:
+                    v = v[self.not_zero_dim]
+                k_list.append(v)
         return q_list, k_list, torch.tensor(index, dtype=torch.long)
 
 

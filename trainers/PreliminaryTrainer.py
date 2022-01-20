@@ -13,7 +13,7 @@ from trainers.BaseTrainer import BaseTrainer
 from datasets.preliminary_dataset import PreliminaryDataset, PreliminaryBatchSampler, preliminary_collate_fn
 from models.mlp import MLP_MoCo
 from losses.supcon import SupConLoss
-from losses.reconstruction import L2ReconstructionLoss, ExpReconstructionLoss
+from losses.reconstruction import L2ReconstructionLoss, ExpReconstructionLoss, EnlargeReconstructionLoss
 
 class PreliminaryTrainer(BaseTrainer):
     def __init__(self, opt_file='args/preliminary_args.yaml'):
@@ -35,13 +35,13 @@ class PreliminaryTrainer(BaseTrainer):
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.logger.info(f'Using device {self.device}')
 
-        self.net = MLP_MoCo()
+        self.net = MLP_MoCo(463)
         if opt.load_model:
             self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
             self.logger.info(f'Model loaded from {opt.load_model}')
         self.net.to(device=self.device)
 
-        self.train_dataset = PreliminaryDataset(opt.source, memory=False)
+        self.train_dataset = PreliminaryDataset(opt.source, memory=True)
         self.n_train = len(self.train_dataset)
         self.train_loader = DataLoader(self.train_dataset,
                                        batch_sampler=PreliminaryBatchSampler(self.train_dataset, opt.batch_size),
@@ -53,7 +53,7 @@ class PreliminaryTrainer(BaseTrainer):
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
 
         self.criterion_c = SupConLoss()
-        self.criterion_r = nn.MSELoss()
+        self.criterion_r = EnlargeReconstructionLoss()
 
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp

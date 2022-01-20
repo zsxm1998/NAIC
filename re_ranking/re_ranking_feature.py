@@ -29,26 +29,26 @@ def re_ranking(probFea,galFea,k1,k2,lambda_value, MemorySave = False, Minibatch 
     query_num = probFea.shape[0]
     all_num = query_num + galFea.shape[0]    
     feat = np.append(probFea,galFea,axis = 0)
-    feat = feat.astype(np.float16)
+    feat = feat.astype(np.float32)
     print('computing original distance')
     if MemorySave:
-        original_dist = np.zeros(shape = [all_num,all_num],dtype = np.float16)
+        original_dist = np.zeros(shape = [all_num,all_num],dtype = np.float32)
         i = 0
         while True:
             it = i + Minibatch
             if it < np.shape(feat)[0]:
-                original_dist[i:it,] = np.power(cdist(feat[i:it,],feat),2).astype(np.float16)
+                original_dist[i:it,] = np.power(cdist(feat[i:it,],feat),2).astype(np.float32)
             else:
-                original_dist[i:,:] = np.power(cdist(feat[i:,],feat),2).astype(np.float16)
+                original_dist[i:,:] = np.power(cdist(feat[i:,],feat),2).astype(np.float32)
                 break
             i = it
     else:
-        original_dist = cdist(feat,feat).astype(np.float16)  
-        original_dist = np.power(original_dist,2).astype(np.float16)
+        original_dist = cdist(feat,feat).astype(np.float32)  
+        original_dist = np.power(original_dist,2).astype(np.float32)
     del feat    
     gallery_num = original_dist.shape[0]
     original_dist = np.transpose(original_dist/np.max(original_dist,axis = 0))
-    V = np.zeros_like(original_dist).astype(np.float16)
+    V = np.zeros_like(original_dist).astype(np.float32)
     initial_rank = np.argsort(original_dist).astype(np.int32)
 
     
@@ -74,7 +74,7 @@ def re_ranking(probFea,galFea,k1,k2,lambda_value, MemorySave = False, Minibatch 
         V[i,k_reciprocal_expansion_index] = weight/np.sum(weight)
     original_dist = original_dist[:query_num,]    
     if k2 != 1:
-        V_qe = np.zeros_like(V,dtype=np.float16)
+        V_qe = np.zeros_like(V,dtype=np.float32)
         for i in range(all_num):
             V_qe[i,:] = np.mean(V[initial_rank[i,:k2],:],axis=0)
         V = V_qe
@@ -84,11 +84,11 @@ def re_ranking(probFea,galFea,k1,k2,lambda_value, MemorySave = False, Minibatch 
     for i in range(gallery_num):
         invIndex.append(np.where(V[:,i] != 0)[0])
     
-    jaccard_dist = np.zeros_like(original_dist,dtype = np.float16)
+    jaccard_dist = np.zeros_like(original_dist,dtype = np.float32)
 
     
     for i in range(query_num):
-        temp_min = np.zeros(shape=[1,gallery_num],dtype=np.float16)
+        temp_min = np.zeros(shape=[1,gallery_num],dtype=np.float32)
         indNonZero = np.where(V[i,:] != 0)[0]
         indImages = []
         indImages = [invIndex[ind] for ind in indNonZero]

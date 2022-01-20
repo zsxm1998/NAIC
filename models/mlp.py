@@ -4,51 +4,45 @@ import torch.nn.functional as F
 
 
 class MLP_Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim=2048):
         super(MLP_Encoder, self).__init__()
         self.relu = nn.ReLU(inplace=True)
-        self.el1 = nn.Linear(2048, 1024)
-        self.en1 = nn.BatchNorm1d(1024)
-        self.el2 = nn.Linear(1024, 512)
-        self.en2 = nn.BatchNorm1d(512)
-        self.el3 = nn.Linear(512, 256)
-        self.en3 = nn.BatchNorm1d(256)
+        self.el1 = nn.Linear(input_dim, 512)
+        self.en1 = nn.LayerNorm(512)
+        self.el2 = nn.Linear(512, 256)
+        self.en2 = nn.LayerNorm(256)
+        self.el3 = nn.Linear(256, 128)
+        self.en3 = nn.LayerNorm(128)
 
     def forward(self, x):
         x = self.relu(self.en1(self.el1(x)))
         x = self.relu(self.en2(self.el2(x)))
         out = self.relu(self.en3(self.el3(x)))
-        # x = self.relu(self.el1(x))
-        # x = self.relu(self.el2(x))
-        # out = self.relu(self.el3(x))
         return out
 
 
 class MLP_Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, output_dim=2048):
         super(MLP_Decoder, self).__init__()
         self.relu = nn.ReLU(inplace=True)
-        self.dl1 = nn.Linear(256, 512)
-        self.dn1 = nn.BatchNorm1d(512)
-        self.dl2 = nn.Linear(512, 1024)
-        self.dn2 = nn.BatchNorm1d(1024)
-        self.dl3 = nn.Linear(1024, 2048)
+        self.dl1 = nn.Linear(128, 256)
+        self.dn1 = nn.LayerNorm(256)
+        self.dl2 = nn.Linear(256, 512)
+        self.dn2 = nn.LayerNorm(512)
+        self.dl3 = nn.Linear(512, output_dim)
 
     def forward(self, x):
         x = self.relu(self.dn1(self.dl1(x)))
         x = self.relu(self.dn2(self.dl2(x)))
         out = self.dl3(x)
-        # x = self.relu(self.dl1(x))
-        # x = self.relu(self.dl2(x))
-        # out = self.dl3(x)
         return out
 
 
 class MLP_AutoEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, vector_dim=2048):
         super(MLP_AutoEncoder, self).__init__()
-        self.encoder = MLP_Encoder()
-        self.decoder = MLP_Decoder()
+        self.encoder = MLP_Encoder(vector_dim)
+        self.decoder = MLP_Decoder(vector_dim)
 
     def forward(self, x):
         m = self.encoder(x)
@@ -57,12 +51,12 @@ class MLP_AutoEncoder(nn.Module):
 
 
 class MLP_MoCo(nn.Module):
-    def __init__(self, base_encoder=MLP_AutoEncoder, dim=256, K=65536, m=0.999):
+    def __init__(self, vector_dim, base_encoder=MLP_AutoEncoder, dim=128, K=65536, m=0.999):
         super(MLP_MoCo, self).__init__()
         self.K = K
         self.m = m
-        self.encoder_q = base_encoder()
-        self.encoder_k = base_encoder()
+        self.encoder_q = base_encoder(vector_dim)
+        self.encoder_k = base_encoder(vector_dim)
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
