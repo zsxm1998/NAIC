@@ -74,3 +74,6 @@ def re_ranking(probFea,galFea,k1,k2,lambda_value, MemorySave = False, Minibatch 
         data_hdf5_file.close()
         temp_hdf5_file.close()
     return final_dist
+
+
+tables.Int64Atom
