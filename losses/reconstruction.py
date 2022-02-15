@@ -30,3 +30,14 @@ class EnlargeReconstructionLoss(nn.Module):
         reconstructed = reconstructed.sign()*reconstructed.abs().pow(self.EXP)
         origin = origin.sign()*origin.abs().pow(self.EXP)
         return self.l2loss(reconstructed, origin)
+
+
+class NormalizeReconstructionLoss(nn.Module):
+    def __init__(self):
+        super(NormalizeReconstructionLoss, self).__init__()
+        self.mseloss = nn.MSELoss(reduction='none')
+
+    def forward(self, reconstructed, origin):
+        mse = self.mseloss(reconstructed, origin)
+        loss = (mse / (origin**2+1e-15)).mean()
+        return loss

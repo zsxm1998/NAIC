@@ -1,3 +1,3 @@
-from trainers.PreliminaryTrainer import PreliminaryTrainer
+from trainers.ReconstructionTrainer import ReconstructionTrainer
 
-PreliminaryTrainer().train()
+ReconstructionTrainer().train()

@@ -25,55 +25,27 @@ def convert_V_to_sp(batch_size=10):
     sp.save_npz(os.path.join(work_dir, 'V.npz'), V_sp)
     v_hdf5_file.close()
 
-convert_V_to_sp()
+#convert_V_to_sp()
 
+def calc_jaccard(num, start, end):
+    V = sp.load_npz(os.path.join(work_dir, 'V.npz'))
+    bsg = 200
+    jaccard_dist = []
+    for i in tqdm(range(0, PROBE_NUM)):
+        probe = sp.vstack([V[i]]*bsg)
+        probe_jaccard = []
+        for j in range(PROBE_NUM, ALL_NUM, bsg):
+            gallary = V[j:j+bsg]
+            if gallary.shape[0] != bsg:
+                probe = sp.vstack([V[i]]*gallary.shape[0])
+            jaccard = probe.minimum(gallary).sum(axis=-1) / probe.maximum(gallary).sum(axis=-1)
+            probe_jaccard.append(sp.csr_matrix(jaccard.transpose()))
+        jaccard_dist.append(sp.hstack(probe_jaccard))
+    jaccard_dist = sp.vstack(jaccard_dist)
+    sp.save_npz(os.path.join(work_dir, 'jaccard_dist.npz'), jaccard_dist)
+        
+calc_jaccard(1,2,3)
 
-# def calc_V(num, start, end, k1=100):
-#     dist_hdf5_file = tables.open_file(os.path.join(work_dir, 'original_dist_pearson.hdf5'), mode='r')
-#     original_dist = dist_hdf5_file.root.original_dist
-#     rank_hdf5_file = tables.open_file(os.path.join(work_dir, 'initial_rank_pearson.hdf5'), mode='r')
-#     initial_rank = rank_hdf5_file.root.initial_rank
-#     v_hdf5_file = tables.open_file(os.path.join(work_dir, f'V_{num}.hdf5'), mode='w')
-#     V = v_hdf5_file.create_carray(v_hdf5_file.root, 'V', tables.Float32Atom(), shape=(end-start, ALL_NUM), filters=tables.Filters())
-
-#     for i in tqdm(range(start, end), desc='calculate V'):
-#         forward_k_neigh_index = initial_rank[i,:k1+1]
-#         backward_k_neigh_index = initial_rank[forward_k_neigh_index,:k1+1]
-#         fi = np.where(backward_k_neigh_index==i)[0]
-#         k_reciprocal_index = forward_k_neigh_index[fi]
-#         k_reciprocal_expansion_index = k_reciprocal_index
-#         for j in range(len(k_reciprocal_index)):
-#             candidate = k_reciprocal_index[j]
-#             candidate_forward_k_neigh_index = initial_rank[candidate,:int(np.around(k1/2))+1]
-#             candidate_backward_k_neigh_index = initial_rank[candidate_forward_k_neigh_index,:int(np.around(k1/2))+1]
-#             fi_candidate = np.where(candidate_backward_k_neigh_index == candidate)[0]
-#             candidate_k_reciprocal_index = candidate_forward_k_neigh_index[fi_candidate]
-#             if len(np.intersect1d(candidate_k_reciprocal_index,k_reciprocal_index))> 2/3*len(candidate_k_reciprocal_index):
-#                 k_reciprocal_expansion_index = np.append(k_reciprocal_expansion_index,candidate_k_reciprocal_index)
-            
-#         k_reciprocal_expansion_index = np.unique(k_reciprocal_expansion_index)
-#         # weight = np.exp(-original_dist[i,k_reciprocal_expansion_index])
-#         # V[i,k_reciprocal_expansion_index] = weight/np.sum(weight)
-#         V[i-start, k_reciprocal_expansion_index] = original_dist[i,k_reciprocal_expansion_index]
-    
-#     v_hdf5_file.close()
-#     rank_hdf5_file.close()
-#     dist_hdf5_file.close()
-
-# #calc_V(4,320000,400000)
-
-# def cat_V():
-#     v_hdf5_file = tables.open_file(os.path.join(work_dir, f'V.hdf5'), mode='w')
-#     V = v_hdf5_file.create_earray(v_hdf5_file.root, 'V', tables.Float32Atom(), shape=(0, ALL_NUM), filters=tables.Filters(), expectedrows=ALL_NUM)
-#     for i in range(10):
-#         vn_hdf5_file = tables.open_file(os.path.join(work_dir, f'V_{i}.hdf5'), mode='r')
-#         Vn = vn_hdf5_file.root.V
-#         for j in tqdm(range(0, Vn.shape[0]), desc=f'cat V:{i}'):
-#             V.append(Vn[j: j+1])
-#         vn_hdf5_file.close()
-#     v_hdf5_file.close()
-
-# #cat_V()
 
 # class LoadV(Dataset):
 #     def __init__(self, dir):
