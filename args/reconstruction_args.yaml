@@ -1,12 +1,12 @@
-info: 64字节
-intermediate_dim: 16
+info: 256字节
+intermediate_dim: 64
 input_dim: 2048
 output_dim: 2048
-memory: true
+memory: false
 not_zero: false
 device: 1
 epochs: 1000
-early_stopping: 100
+early_stopping: 700
 batch_size: 512
 lr: 0.1
 source: /nfs3-p2/zsxm/naic/preliminary/train/

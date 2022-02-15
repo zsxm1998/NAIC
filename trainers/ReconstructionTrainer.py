@@ -10,7 +10,7 @@ from torch import optim
 
 from trainers.BaseTrainer import BaseTrainer
 from datasets.reconstruction_dataset import ReconstructionDataset
-from models.autoencoder import AutoEncoder
+from models.conv import AutoEncoder
 from losses.reconstruction import NormalizeReconstructionLoss
 
 class ReconstructionTrainer(BaseTrainer):
@@ -81,7 +81,7 @@ class ReconstructionTrainer(BaseTrainer):
                 with tqdm(total=self.n_train, desc=f'Epoch {epoch + 1}/{self.epochs}', unit='vector') as pbar:
                     for vectors in self.train_loader:
                         global_step += 1
-                        vectors = vectors.to(self.device)
+                        vectors = vectors.to(self.device).unsqueeze(1)
 
                         reconstruct_v = self.net(vectors)
 
