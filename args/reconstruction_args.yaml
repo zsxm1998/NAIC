@@ -2,7 +2,7 @@ info: 256字节
 intermediate_dim: 64
 input_dim: 2048
 output_dim: 2048
-memory: true
+memory: false
 not_zero: false
 device: 1
 epochs: 1000
