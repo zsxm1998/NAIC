@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from tqdm import tqdm
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch import optim
 
@@ -50,7 +51,7 @@ class ReconstructionTrainer(BaseTrainer):
                                        num_workers=8, 
                                        pin_memory=True)
 
-        self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr)
+        self.optimizer = optim.RMSprop(self.net.parameters(), lr=opt.lr)
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
 
         self.criterion = NormalizeReconstructionLoss()
@@ -93,7 +94,7 @@ class ReconstructionTrainer(BaseTrainer):
 
                         self.optimizer.zero_grad()
                         loss.backward()
-                        #nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
+                        nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
                         self.optimizer.step()
 
                         pbar.update(vectors.shape[0])
