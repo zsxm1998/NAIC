@@ -1,15 +1,14 @@
-info: 256字节
-intermediate_dim: 64
-input_dim: 2048
-output_dim: 2048
-memory: false
-not_zero: false
+info: 64字节，loss换用MSE，结构加深为6层，网络整体拓宽16倍，2层dp，dp参数改为0.5/0.3，使用BN
+intermediate_dim: 16
+model: mlp
+input_dim: 463
+output_dim: 463
 device: 1
-epochs: 1000
-early_stopping: 700
-batch_size: 512
-lr: 0.001
-source: /nfs3-p2/zsxm/naic/preliminary/train/
+epochs: 10000
+early_stopping: 3000
+batch_size: 2048
+lr: 0.001 #0.00000001
+source: /nfs3-p1/zsxm/naic/preliminary/ae_dataset/
 save_cp: false
 load_encoder: False
 load_decoder: False

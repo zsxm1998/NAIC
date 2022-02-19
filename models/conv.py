@@ -9,21 +9,18 @@ class Encoder(nn.Module):
         self.input_dim = input_dim
 
         self.relu = nn.ReLU(inplace=True)
-        self.el1 = nn.Conv1d(1, 64, 11, 2)
+        self.el1 = nn.Conv1d(1, 64, 7, 2)
         self.en1 = nn.BatchNorm1d(64)
-        self.el2 = nn.Conv1d(64, 128, 13, 2)
+        self.el2 = nn.Conv1d(64, 128, 5, 2)
         self.en2 = nn.BatchNorm1d(128)
-        self.el3 = nn.Conv1d(128, 256, 15, 2)
+        self.el3 = nn.Conv1d(128, 256, 3, 2)
         self.en3 = nn.BatchNorm1d(256)
-        self.el4 = nn.Conv1d(256, 512, 17, 2)
-        self.en4 = nn.BatchNorm1d(512)
-        self.el5 = nn.LazyLinear(intermediate_dim, bias=False)
+        self.el5 = nn.Linear(14336, intermediate_dim)
 
     def forward(self, x):
         x = self.relu(self.en1(self.el1(x)))
         x = self.relu(self.en2(self.el2(x)))
         x = self.relu(self.en3(self.el3(x)))
-        x = self.relu(self.en4(self.el4(x)))
         x = torch.flatten(x, 1)
         return self.el5(x)
 
@@ -48,9 +45,9 @@ class Decoder(nn.Module):
         return out
 
 
-class AutoEncoder(nn.Module):
+class AutoEncoderConv(nn.Module):
     def __init__(self, intermediate_dim, input_dim, output_dim):
-        super(AutoEncoder, self).__init__()
+        super(AutoEncoderConv, self).__init__()
         self.intermediate_dim = intermediate_dim
         self.input_dim = input_dim
         self.output_dim = output_dim
