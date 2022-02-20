@@ -18,7 +18,7 @@ def extract_zipfile(dir_input: str, dir_dest: str):
     return 1
 
 class Encoder(nn.Module):
-    def __init__(self, intermediate_dim, input_dim=2048):
+    def __init__(self, intermediate_dim, input_dim=463):
         super(Encoder, self).__init__()
         self.intermediate_dim = intermediate_dim
         self.input_dim = input_dim
@@ -40,12 +40,13 @@ class Encoder(nn.Module):
 class FeatureDataset(Dataset):
     def __init__(self, file_dir):
         self.query_fea_paths = glob.glob(os.path.join(file_dir, '*.*'))
+        self.no_zero_dim = torch.load('./not_zero_dim.pt')
 
     def __len__(self):
         return len(self.query_fea_paths)
 
     def __getitem__(self, index):
-        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))
+        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))[self.no_zero_dim]
         basename = os.path.splitext(os.path.basename(self.query_fea_paths[index]))[0]
         return vector, basename
 

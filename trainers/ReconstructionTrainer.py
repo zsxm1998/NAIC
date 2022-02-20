@@ -14,6 +14,7 @@ from trainers.BaseTrainer import BaseTrainer
 from datasets.reconstruction_dataset import ReconstructionDataset
 from models.autoencoder import AutoEncoderMLP
 from models.conv import AutoEncoderConv
+from models.vae import VAE
 from losses.reconstruction import NormalizeReconstructionLoss, CosineReconstructionLoss, L2ReconstructionLoss, EnlargeReconstructionLoss
 
 class ReconstructionTrainer(BaseTrainer):
@@ -40,6 +41,8 @@ class ReconstructionTrainer(BaseTrainer):
             self.net = AutoEncoderMLP(opt.intermediate_dim, opt.input_dim, opt.output_dim)
         elif opt.model.lower() == 'conv':
             self.net = AutoEncoderConv(opt.intermediate_dim, opt.input_dim, opt.output_dim)
+        elif opt.model.lower() == 'vae':
+            self.net = VAE(opt.intermediate_dim, opt.input_dim, opt.output_dim)
         else:
             raise ValueError('"model" should be either mlp or conv')
         
@@ -98,18 +101,25 @@ class ReconstructionTrainer(BaseTrainer):
             try:
                 self.net.train()
                 epoch_loss = 0
+                epoch_recons_loss, epoch_latent_loss = 0, 0
                 with tqdm(total=self.n_train, desc=f'Epoch {epoch + 1}/{self.epochs}', unit='vector') as pbar:
                     for vectors in self.train_loader:
                         global_step += 1
                         vectors = vectors.to(self.device)
 
-                        reconstruct_v = self.net(vectors if self.opt.model.lower() == 'mlp' else vectors.unsqueeze(1))
-
-                        loss = self.criterion(reconstruct_v, vectors)
+                        if self.opt.model.lower() == 'vae':
+                            reconstruct_v, mu, log_var = self.net(vectors)
+                            loss, recons_loss, latent_loss = self.net.loss(self.criterion, vectors, reconstruct_v, mu, log_var)
+                            self.writer.add_scalar('Train_Loss/recons_loss', recons_loss.item(), global_step)
+                            self.writer.add_scalar('Train_Loss/latent_loss', latent_loss.item(), global_step)
+                            pbar.set_postfix(OrderedDict(**{'loss': loss.item(), 'recons':recons_loss.item(), 'latent': latent_loss.item()}))
+                        else:
+                            reconstruct_v = self.net(vectors if self.opt.model.lower() == 'mlp' else vectors.unsqueeze(1))
+                            loss = self.criterion(reconstruct_v, vectors)
+                            pbar.set_postfix(OrderedDict(**{'loss (batch)': loss.item()}))
 
                         self.writer.add_scalar('Train_Loss/loss', loss.item(), global_step)
                         epoch_loss += loss.item() * vectors.size(0)
-                        pbar.set_postfix(OrderedDict(**{'loss (batch)': loss.item()}))
 
                         self.optimizer.zero_grad()
                         loss.backward()
@@ -172,7 +182,11 @@ class ReconstructionTrainer(BaseTrainer):
         with tqdm(total=self.n_val, desc=f'Validation round', unit='vector', leave=False) as pbar:
             for vectors in self.val_loader:
                 vectors = vectors.to(self.device)
-                reconstruct_v = self.net(vectors if self.opt.model.lower() == 'mlp' else vectors.unsqueeze(1))
+                
+                if self.opt.model.lower() == 'vae':
+                    reconstruct_v, mu, log_var = self.net(vectors)
+                else:
+                    reconstruct_v = self.net(vectors if self.opt.model.lower() == 'mlp' else vectors.unsqueeze(1))
 
                 loss = self.val_criterion(vectors, reconstruct_v)
                 val_score += loss.item() * vectors.size(0)

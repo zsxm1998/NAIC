@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class Decoder(nn.Module):
-    def __init__(self, intermediate_dim, output_dim=2048):
+    def __init__(self, intermediate_dim, output_dim=463):
         super(Decoder, self).__init__()
         self.intermediate_dim = intermediate_dim
         self.output_dim = output_dim
@@ -47,14 +47,20 @@ def reconstruct(byte_rate: str):
     net.load_state_dict(torch.load(f'./Decoder_{byte_rate}.pth', map_location=torch.device('cpu')))
     net.eval()
 
+    no_zero_dim = torch.load('./not_zero_dim.pt')
+
     featuredataset = FeatureDataset(compressed_query_fea_dir)
     featureloader = DataLoader(featuredataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     for vector, basename in featureloader:
         reconstructed = net(vector)
+
+        expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
+        expand_r[:, no_zero_dim] = reconstructed
+
         for i, bname in enumerate(basename):
             reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
             with open(reconstructed_fea_path, 'wb') as bf:
-                bf.write(reconstructed[i].numpy().tobytes())
+                bf.write(expand_r[i].numpy().tobytes())
 
     print('Decode Done' + byte_rate)

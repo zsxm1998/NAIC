@@ -62,12 +62,9 @@ class Decoder(nn.Module):
         out = self.dl5(x)
         return out
 
-
-
-
-class AutoEncoderMLP(nn.Module):
+class VAE(nn.Module):
     def __init__(self, intermediate_dim, input_dim, output_dim):
-        super(AutoEncoderMLP, self).__init__()
+        super(VAE, self).__init__()
         self.intermediate_dim = intermediate_dim
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -76,4 +73,13 @@ class AutoEncoderMLP(nn.Module):
         self.decoder = Decoder(intermediate_dim, output_dim)
 
     def forward(self, x):
-        return self.decoder(self.encoder(x))
+        mu, log_var = self.encoder(x)
+        z = self.encoder.reparameterization(mu, log_var)
+        recons = self.decoder(z)
+        return recons, mu, log_var
+
+    def loss(self, recons_loss_f, vec, recons, mu, log_var):
+        recons_loss = recons_loss_f(recons, vec)
+        latent_loss = ((torch.square(mu) + log_var.exp() - log_var - 1).sum(dim=-1) * 0.5).mean()
+        loss = recons_loss + latent_loss
+        return loss, recons_loss, latent_loss

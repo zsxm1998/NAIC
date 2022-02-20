@@ -1,5 +1,5 @@
-info: 64字节，loss换用MSE，结构加深为6层，网络整体拓宽16倍，2层dp，dp参数改为0.5/0.3，使用BN
-intermediate_dim: 16
+info: 128字节，loss换用MSE，结构加深1层为5层，网络整体拓宽4倍，dp参数改为0.5/0.3, 2层dp，使用BN
+intermediate_dim: 32
 model: mlp
 input_dim: 463
 output_dim: 463
