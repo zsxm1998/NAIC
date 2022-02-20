@@ -120,7 +120,7 @@ class FeatureDataset(Dataset):
         return len(self.query_fea_paths)
 
     def __getitem__(self, index):
-        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))
+        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f2')).float()
         basename = os.path.splitext(os.path.basename(self.query_fea_paths[index]))[0]
         return vector, basename
 
@@ -137,7 +137,7 @@ def reconstruct(byte_rate: str):
             reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, query_basename + '.dat')
             write_feature_file(reconstructed_fea, reconstructed_fea_path)
     else:
-        net = Decoder(int(int(byte_rate)/4))
+        net = Decoder(int(int(byte_rate)/2), 463)
         net.load_state_dict(torch.load(f'./Decoder_{byte_rate}.pth', map_location=torch.device('cpu')))
         net.eval()
 

@@ -188,7 +188,7 @@ def compress_all(input_path: str, bytes_rate: int):
             compressed_fea_path = os.path.join(compressed_query_fea_dir, query_basename + '.dat')
             compress_feature(fea, bytes_rate, compressed_fea_path)
     else:
-        net = Encoder(int(bytes_rate/4))
+        net = Encoder(int(bytes_rate/2), 463)
         net.load_state_dict(torch.load(f'./Encoder_{bytes_rate}.pth', map_location=torch.device('cpu')))
         net.eval()
 
@@ -196,7 +196,7 @@ def compress_all(input_path: str, bytes_rate: int):
         featureloader = DataLoader(featuredataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
         for vector, basename in featureloader:
-            compressed = net(vector)
+            compressed = net(vector).half()
             for i, bname in enumerate(basename):
                 compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
                 with open(compressed_fea_path, 'wb') as bf:
@@ -211,6 +211,3 @@ def compress(test_path:str, byte: str):
     compress_all(query_fea_dir, int(byte))
     shutil.rmtree(query_fea_dir)
     return 1
-
-
-
