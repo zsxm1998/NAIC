@@ -1,11 +1,11 @@
-info: 128字节，loss换用MSE，结构加深1层为5层，网络整体拓宽4倍，dp参数改为0.5/0.3, 2层dp，使用BN
-intermediate_dim: 32
+info: 128字节，loss换用MSE，结构加深为6层，网络整体拓宽8倍，使用BN，中间结果使用float16存储, 你和queryB
+intermediate_dim: 64
 model: mlp
 input_dim: 463
 output_dim: 463
-device: 1
-epochs: 10000
-early_stopping: 3000
+device: 0
+epochs: 5000
+early_stopping: 2000
 batch_size: 2048
 lr: 0.001 #0.00000001
 source: /nfs3-p1/zsxm/naic/preliminary/ae_dataset/

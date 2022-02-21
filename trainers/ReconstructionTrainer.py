@@ -54,7 +54,7 @@ class ReconstructionTrainer(BaseTrainer):
             self.logger.info(f'Decoder loaded from {opt.load_decoder}')
         self.net.to(device=self.device)
 
-        self.train_dataset = ReconstructionDataset(opt.source, 'train_data_reshape.pt')
+        self.train_dataset = ReconstructionDataset(opt.source, 'query_reshape_B.pt')
         self.n_train = len(self.train_dataset)
         self.train_loader = DataLoader(self.train_dataset,
                                        batch_size=opt.batch_size,
@@ -62,7 +62,7 @@ class ReconstructionTrainer(BaseTrainer):
                                        num_workers=8, 
                                        pin_memory=True)
 
-        self.val_dataset = ReconstructionDataset(opt.source, 'val_data_reshape.pt')
+        self.val_dataset = ReconstructionDataset(opt.source, 'query_reshape_B.pt')
         self.n_val = len(self.val_dataset)
         self.val_loader = DataLoader(self.val_dataset,
                                      batch_size=opt.batch_size,
