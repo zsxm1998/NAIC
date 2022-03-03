@@ -1,4 +1,4 @@
-info: 128字节，loss换用MSE，结构加深为6层，网络整体拓宽8倍，使用BN，中间结果使用float16存储, 你和queryB
+info: 128字节，loss换用MSE，结构加深为6层，网络整体拓宽8倍，使用BN，中间结果使用float16存储, 拟合queryB
 intermediate_dim: 64
 model: mlp
 input_dim: 463

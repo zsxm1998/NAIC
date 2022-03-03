@@ -1,3 +1,3 @@
-from trainers.ReconstructionTrainer import ReconstructionTrainer
+from trainers.RematchTrainer import RematchTrainer
 
-ReconstructionTrainer().train()
+RematchTrainer().train()

@@ -1,0 +1,9 @@
+info: 第一次训练
+device: 0
+epochs: 1000
+early_stopping: 100
+batch_size: 248
+lr: 0.1
+source: /nfs3-p1/zsxm/naic/rematch/train/
+save_cp: false
+load_model: False
