@@ -35,7 +35,7 @@ class RematchTrainer(BaseTrainer):
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.logger.info(f'Using device {self.device}')
 
-        self.net = MoCo(34)
+        self.net = MoCo(50)
         if opt.load_model:
             self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
             self.logger.info(f'Model loaded from {opt.load_model}')
@@ -52,7 +52,7 @@ class RematchTrainer(BaseTrainer):
         self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr)
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
 
-        self.criterion = SupConLoss()
+        self.criterion = SupConLoss(concat=False)
 
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp

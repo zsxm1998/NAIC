@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import time
 import logging
@@ -50,6 +51,7 @@ class BaseTrainer(ABC):
         if not os.listdir(self.checkpoint_dir):
             os.remove(self.checkpoint_dir)
             self.logger.info('Remove self.checkpoint_dir')
+        gc.collect()
 
     @abstractmethod
     def train(self):
