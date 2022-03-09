@@ -11,8 +11,9 @@ from PIL import Image
 from torchvision import transforms as T
 
 class RematchDataset(Dataset):
-    def __init__(self, dir, transform=None):
+    def __init__(self, dir, batch_size, transform=None):
         self.file_dir = join(dir, 'train_picture')
+        self.batch_size = batch_size
         self.transform = transform if transform is not None else T.ToTensor()
         self.datas = {}
 
@@ -29,15 +30,15 @@ class RematchDataset(Dataset):
         for k, v in self.datas.items():
             l = len(v)//2
             self.len_idx_sets.setdefault(l, set()).add(k)
-            self.idx2len[k] = l
-            self.q_len += l
-            self.max_len = max(self.max_len, l)
+            self.idx2len[k] = min(l, batch_size)
+            self.q_len += min(l, batch_size)
+            self.max_len = max(self.max_len, min(l, batch_size))
 
     def __len__(self):
         return self.q_len
 
     def __getitem__(self, index):
-        q_file_list = random.sample(self.datas[index], len(self.datas[index])//2)
+        q_file_list = random.sample(self.datas[index], self.idx2len[index])
         k_file_list = [f for f in self.datas[index] if f not in q_file_list]
         q_list, k_list = [], []
         for q_file in q_file_list:
