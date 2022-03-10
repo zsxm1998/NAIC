@@ -277,10 +277,10 @@ class Encoder(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.el1 = nn.Linear(input_dim, input_dim)
         self.el2 = nn.Linear(input_dim, intermediate_dim)
-        self.en2 = nn.BatchNorm1d(intermediate_dim, affine=False)
+        #self.en2 = nn.BatchNorm1d(intermediate_dim, affine=False)
 
     def forward(self, x):
-        return self.en2(self.el2(self.relu(self.el1(x))))
+        return F.normalize(self.el2(self.relu(self.el1(x))), dim=1)
 
 
 class Decoder(nn.Module):
@@ -368,8 +368,8 @@ class MoCo(nn.Module):
             k = self.extractor_k(input_k)
             k_comp = self.encoder_k(k)
         k_reco = self.decoder(k_comp.half().float())
-        q_comp = F.normalize(q_comp, dim=1)
-        k_comp = F.normalize(k_comp, dim=1)
+        # q_comp = F.normalize(q_comp, dim=1)
+        # k_comp = F.normalize(k_comp, dim=1)
         queue = self.queue.clone().detach()
         queue_label = self.queue_label.clone().detach()
         self._dequeue_and_enqueue(k_comp, k_label)

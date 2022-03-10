@@ -1,4 +1,4 @@
-info: End2End第一次训练，ResNet50，256字节压缩
+info: End2End，ResNet50，256字节压缩，encoder输出直接normlize
 model_depth: 50
 byte_rate: 256
 device: 1

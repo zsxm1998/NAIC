@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from models.embedding import MoCo, resnet_encoder
+from models.end2end import resnet_encoder, Encoder
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import glob
@@ -37,16 +37,21 @@ dataloader = DataLoader(dataset, shuffle=False, batch_size=128, num_workers=8)
 fea_dir = '/nfs3-p2/zsxm/naic/rematch/train/features'
 os.makedirs(fea_dir, exist_ok=True)
 
-encoder = resnet_encoder(34)
-encoder.load_state_dict(torch.load('zstage/project/Encoder_best.pth'))
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+extractor = resnet_encoder(50)
+extractor.load_state_dict(torch.load('zstage/project/Extractor_best.pth'))
+extractor.to(device)
+extractor.eval()
+encoder = Encoder(128, 2048)
+encoder.load_state_dict(torch.load('zstage/project/Encoder_128_best.pth'))
 encoder.to(device)
 encoder.eval()
+
 fl = []
 with torch.no_grad():
     for imgs, basenames in tqdm(dataloader):
         imgs = imgs.to(device)
-        features = encoder(imgs)
+        features = encoder(extractor(imgs))
         fl.append(features.cpu())
 
 fl = torch.cat(fl)
