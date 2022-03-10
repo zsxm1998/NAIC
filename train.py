@@ -1,3 +1,3 @@
-from trainers.RematchTrainer import RematchTrainer
+from trainers.End2EndTrainer import End2EndTrainer
 
-RematchTrainer().train()
+End2EndTrainer().train()

@@ -1,0 +1,11 @@
+info: End2End第一次训练，ResNet50，256字节压缩
+model_depth: 50
+byte_rate: 256
+device: 1
+epochs: 100
+early_stopping: 0
+batch_size: 128
+lr: 0.1
+source: /nfs3-p2/zsxm/naic/rematch/train/
+save_cp: false
+load_model: False

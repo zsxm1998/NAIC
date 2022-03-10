@@ -28,11 +28,11 @@ class RematchDataset(Dataset):
         self.len_idx_sets, self.idx2len = {0:set()}, {}
         self.q_len, self.max_len = 0, -1
         for k, v in self.datas.items():
-            l = len(v)//2
+            l = min(len(v)//2, batch_size)
             self.len_idx_sets.setdefault(l, set()).add(k)
-            self.idx2len[k] = min(l, batch_size)
-            self.q_len += min(l, batch_size)
-            self.max_len = max(self.max_len, min(l, batch_size))
+            self.idx2len[k] = l
+            self.q_len += l
+            self.max_len = max(self.max_len, l)
 
     def __len__(self):
         return self.q_len
