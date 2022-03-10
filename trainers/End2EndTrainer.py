@@ -104,8 +104,10 @@ class End2EndTrainer(BaseTrainer):
 
                         pbar.update(q_in.shape[0])
 
-                epoch_loss = epoch_c_loss/self.n_train + epoch_c_loss/r_loss_count
-                self.logger.info(f'Train epoch {epoch + 1} loss: {epoch_loss}')
+                epoch_c_loss /= self.n_train
+                epoch_r_loss /= r_loss_count
+                epoch_loss = epoch_c_loss + epoch_r_loss
+                self.logger.info(f'Train epoch {epoch + 1} loss: {epoch_loss}, contrastive loss: {epoch_c_loss}, reconstruction loss: {epoch_r_loss}')
 
                 for tag, value in self.net.named_parameters():
                     tag = tag.replace('.', '/')
