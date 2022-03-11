@@ -23,7 +23,7 @@ class RematchDataset(Dataset):
                 if not line: break
                 line = line.strip()
                 elems = line.split(' ')
-                self.datas.setdefault(int(elems[1]), []).append(elems[0].replace('train/', ''))
+                self.datas.setdefault(int(elems[1]), []).append(elems[0])
         self.instance_len = len(self.datas)
         self.len_idx_sets, self.idx2len = {0:set()}, {}
         self.q_len, self.max_len = 0, -1
@@ -115,7 +115,9 @@ class RematchBatchSampler(Sampler[List[int]]):
                 len_idx_sets[idx_len].remove(index)
                 batch_len = idx_len
         if len(batch) != 0:
-            yield batch
+            final_batch_len = sum([self.dataset.idx2len[idx] for idx in batch])
+            if final_batch_len > 1:
+                yield batch
 
 
 def rematch_collate_fn(input_list): #[(q_list, k_list, label), (q_list, k_list, label)...]
@@ -128,3 +130,24 @@ def rematch_collate_fn(input_list): #[(q_list, k_list, label), (q_list, k_list, 
         q_list.extend(input[0])
         k_list.extend(input[1])
     return torch.stack(q_list), torch.stack(k_list), torch.cat(q_label_list), torch.cat(k_label_list)
+
+
+class RematchEvalDataset(Dataset):
+    def __init__(self, dir, transform=None):
+        self.file_dir = join(dir, 'train_picture')
+        self.transform = transform if transform is not None else T.ToTensor()
+        self.datas = []
+
+        with open(join(dir, 'val_list.txt'), 'r') as f:
+            lines = f.readlines()
+        for line in lines:
+            elems = line.split()
+            self.datas.append((join(self.file_dir, elems[0]), int(elems[1])))
+
+    def __len__(self):
+        return len(self.datas)
+
+    def __getitem__(self, index):
+        img = self.transform(Image.open(self.datas[index][0]))
+        idx = self.datas[index][1]
+        return img, torch.tensor(idx, dtype=torch.long)
