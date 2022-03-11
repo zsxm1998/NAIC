@@ -1,7 +1,7 @@
-info: End2End，ResNet50，256字节压缩，encoder输出直接normlize
+info: End2End，ResNet50，256字节压缩，对比学习使用q去和k做loss，warmup cosine学习率，增加identity交叉熵loss，增加验证集
 model_depth: 50
 byte_rate: 256
-device: 1
+device: 2
 epochs: 100
 early_stopping: 0
 batch_size: 128

@@ -6,12 +6,12 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 class CosineAnnealingWithWarmUpLR(_LRScheduler):
     def __init__(self, optimizer, T_total, warm_up_lr=1e-8, warm_up_step=0, eta_min=0, last_epoch=-1, verbose=False):
-        super(CosineAnnealingWithWarmUpLR, self).__init__(optimizer, last_epoch, verbose)
         self.T_total = T_total
-        self.warm_up_lr = min(warm_up_lr + self.base_lr)
+        self.warm_up_lr = warm_up_lr #min(warm_up_lr + self.base_lr)
         self.warm_up_step = warm_up_step
         self.T_cos = T_total - warm_up_step
         self.eta_min = eta_min
+        super(CosineAnnealingWithWarmUpLR, self).__init__(optimizer, last_epoch, verbose)
 
     def get_lr(self):
         if not self._get_lr_called_within_step:

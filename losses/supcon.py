@@ -18,6 +18,7 @@ class SupConLoss(nn.Module):
         
         mask = torch.eq(q_label, k_label.T).float().to(q.device)
         logits = torch.matmul(q, k.T) / self.temperature
+        logits = logits - torch.max(logits, dim=1, keepdim=True)[0].detach()
         exp_logits = torch.exp(logits)
         if self.concat:
             mask = torch.scatter(mask, 1, torch.arange(mask.shape[0]).view(-1,1).to(mask.device), 0)

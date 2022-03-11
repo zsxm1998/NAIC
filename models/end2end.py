@@ -277,10 +277,10 @@ class Encoder(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.el1 = nn.Linear(input_dim, input_dim)
         self.el2 = nn.Linear(input_dim, intermediate_dim)
-        #self.en2 = nn.BatchNorm1d(intermediate_dim, affine=False)
+        self.en2 = nn.BatchNorm1d(intermediate_dim)
 
     def forward(self, x):
-        return F.normalize(self.el2(self.relu(self.el1(x))), dim=1)
+        return self.en2(self.el2(self.relu(self.el1(x))))
 
 
 class Decoder(nn.Module):
@@ -305,12 +305,11 @@ class Decoder(nn.Module):
         x = self.relu(self.dn2(self.dl2(x)))
         x = self.relu(self.dn3(self.dl3(x)))
         x = self.relu(self.dn4(self.dl4(x)))
-        out = self.dl5(x)
-        return out
+        return F.leaky_relu_(self.dl5(x))
 
 
 class MoCo(nn.Module):
-    def __init__(self, model_depth, dim=128, K=65536, m=0.999):
+    def __init__(self, model_depth, id_num, dim=128, K=65536, m=0.999):
         super(MoCo, self).__init__()
         self.K = K
         self.m = m
@@ -329,9 +328,11 @@ class MoCo(nn.Module):
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
+
+        self.BNNect = nn.Linear(self.extractor_out_dim, id_num, bias=False) #nn.Sequential(nn.BatchNorm1d(self.extractor_out_dim), nn.Linear(self.extractor_out_dim, id_num, bias=False))
         
         # create the queue
-        self.register_buffer("queue", torch.randn(K, dim))
+        self.register_buffer("queue", torch.randn(K, self.extractor_out_dim))
         self.queue = F.normalize(self.queue, dim=1)
         self.register_buffer("queue_label", torch.ones(K)*-1)
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
@@ -361,16 +362,20 @@ class MoCo(nn.Module):
 
     def forward(self, input_q, input_k, k_label):
         q = self.extractor_q(input_q)
-        q_comp = self.encoder_q(q)
-        q_reco = self.decoder(q_comp.half().float())
+        q_id = self.BNNect(q)
+        # q_comp = self.encoder_q(q)
+        # q_reco = self.decoder(q_comp.half().float())
+        q_reco = self.decoder(self.encoder_q(q).half().float())
+        q_reco_id = self.BNNect(q_reco)
         with torch.no_grad():
             self._momentum_update_key_encoder()
             k = self.extractor_k(input_k)
             k_comp = self.encoder_k(k)
         k_reco = self.decoder(k_comp.half().float())
+        k_reco_id = self.BNNect(k_reco)
         # q_comp = F.normalize(q_comp, dim=1)
         # k_comp = F.normalize(k_comp, dim=1)
         queue = self.queue.clone().detach()
         queue_label = self.queue_label.clone().detach()
-        self._dequeue_and_enqueue(k_comp, k_label)
-        return q, k, q_comp, k_comp, queue, queue_label, q_reco, k_reco
+        self._dequeue_and_enqueue(k, k_label)
+        return q, k, queue, queue_label, q_reco, k_reco, q_id, q_reco_id, k_reco_id
