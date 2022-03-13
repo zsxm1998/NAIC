@@ -164,7 +164,7 @@ class ResNetEncoder(nn.Module):
                                        dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
                                        dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, #使用baseline提到的last stride=1的trick
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, n_outputs)
@@ -268,9 +268,6 @@ def resnet_encoder(model_depth: int, **kwargs: Any) -> ResNetEncoder:
     return model
 
 
-resneet_encoder_out_dim_dir = {18:512, 34:512, 50:2048, 101:2048, 152:2048}
-
-
 class Encoder(nn.Module):
     def __init__(self, intermediate_dim, input_dim):
         super(Encoder, self).__init__()
@@ -293,92 +290,40 @@ class Decoder(nn.Module):
         self.output_dim = output_dim
 
         self.relu = nn.LeakyReLU(inplace=True)
-        self.dl1 = nn.Linear(intermediate_dim, 512)
-        self.dn1 = nn.BatchNorm1d(512)
-        self.dl2 = nn.Linear(512, 1024)
-        self.dn2 = nn.BatchNorm1d(1024)
-        self.dl3 = nn.Linear(1024, 2048)
-        self.dn3 = nn.BatchNorm1d(2048)
-        self.dl4 = nn.Linear(2048, 4096)
-        self.dn4 = nn.BatchNorm1d(4096)
-        self.dl5 = nn.Linear(4096, output_dim)
+        self.dl1 = nn.Linear(intermediate_dim, 256)
+        self.dn1 = nn.BatchNorm1d(256)
+        self.dl2 = nn.Linear(256, 512)
+        self.dn2 = nn.BatchNorm1d(512)
+        self.dl3 = nn.Linear(512, 1024)
+        self.dn3 = nn.BatchNorm1d(1024)
+        self.dp3 = nn.Dropout(0.05)
+        self.dl4 = nn.Linear(1024, 2048)
+        self.dn4 = nn.BatchNorm1d(2048)
+        self.dp4 = nn.Dropout(0.1)
+        self.dl5 = nn.Linear(2048, 4096)
+        self.dn5 = nn.BatchNorm1d(4096)
+        self.dp5 = nn.Dropout(0.2)
+        self.dl6 = nn.Linear(4096, output_dim)
 
     def forward(self, x):
         x = self.relu(self.dn1(self.dl1(x)))
         x = self.relu(self.dn2(self.dl2(x)))
-        x = self.relu(self.dn3(self.dl3(x)))
-        x = self.relu(self.dn4(self.dl4(x)))
-        return self.dl5(x)
+        x = self.dp3(self.relu(self.dn3(self.dl3(x))))
+        x = self.dp4(self.relu(self.dn4(self.dl4(x))))
+        x = self.dp5(self.relu(self.dn5(self.dl5(x))))
+        return self.dl6(x)
 
 
-class MoCo(nn.Module):
-    def __init__(self, model_depth, id_num, extractor_out_dim=128, compress_dim=32, K=65536, m=0.999):
-        super(MoCo, self).__init__()
-        self.K = K
-        self.m = m
+class EndtoEndModel(nn.Module):
+    def __init__(self, model_depth, id_num, extractor_out_dim, compress_dim):
+        super(EndtoEndModel, self).__init__()
+        self.extractor = resnet_encoder(model_depth, n_outputs=extractor_out_dim)
+        self.encoder = Encoder(compress_dim, extractor_out_dim)
+        self.decoder = Decoder(compress_dim, extractor_out_dim)
+        self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim, affine=False), nn.Linear(extractor_out_dim, id_num, bias=False))
 
-        self.extractor_q = resnet_encoder(model_depth, n_outputs=extractor_out_dim)
-        self.extractor_k = resnet_encoder(model_depth, n_outputs=extractor_out_dim)
-        self.extractor_out_dim = extractor_out_dim # resneet_encoder_out_dim_dir[model_depth]
-        self.compress_dim = compress_dim
-        for param_q, param_k in zip(self.extractor_q.parameters(), self.extractor_k.parameters()):
-            param_k.data.copy_(param_q.data)  # initialize
-            param_k.requires_grad = False  # not update by gradient
-
-        self.encoder_q = Encoder(compress_dim, self.extractor_out_dim)
-        self.encoder_k = Encoder(compress_dim, self.extractor_out_dim)
-        self.decoder = Decoder(compress_dim, self.extractor_out_dim)
-        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
-            param_k.data.copy_(param_q.data)  # initialize
-            param_k.requires_grad = False  # not update by gradient
-
-        self.BNNect = nn.Sequential(nn.BatchNorm1d(self.extractor_out_dim), nn.Linear(self.extractor_out_dim, id_num, bias=False))
-        
-        # create the queue
-        self.register_buffer("queue", torch.randn(K, self.extractor_out_dim))
-        self.queue = F.normalize(self.queue, dim=1)
-        self.register_buffer("queue_label", torch.ones(K)*-1)
-        self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
-
-    @torch.no_grad()
-    def _momentum_update_key_encoder(self):
-        for param_q, param_k in zip(self.extractor_q.parameters(), self.extractor_k.parameters()):
-            param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
-        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
-            param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
-
-    @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys, keys_label):
-        batch_size = keys.shape[0]
-        ptr = int(self.queue_ptr)
-        if ptr+batch_size <= self.K:
-            self.queue[ptr:ptr+batch_size] = keys
-            self.queue_label[ptr:ptr+batch_size] = keys_label
-        else:
-            diff = self.K - ptr
-            self.queue[ptr:] = keys[:diff]
-            self.queue_label[ptr:] = keys_label[:diff]
-            self.queue[:batch_size-diff] = keys[diff:]
-            self.queue_label[:batch_size-diff] = keys_label[diff:]
-        ptr = (ptr + batch_size) % self.K
-        self.queue_ptr[0] = ptr
-
-    def forward(self, input_q, input_k, k_label):
-        q = self.extractor_q(input_q)
-        q_id = self.BNNect(q)
-        # q_comp = self.encoder_q(q)
-        # q_reco = self.decoder(q_comp.half().float())
-        q_reco = self.decoder(self.encoder_q(q).half().float()) if random() < 0.5 else self.decoder(self.encoder_q(q))
-        q_reco_id = self.BNNect(q_reco)
-        with torch.no_grad():
-            self._momentum_update_key_encoder()
-            k = self.extractor_k(input_k)
-            k_comp = self.encoder_k(k)
-        k_reco = self.decoder(k_comp.half().float()) if random() < 0.5 else self.decoder(k_comp)
-        k_reco_id = self.BNNect(k_reco)
-        # q_comp = F.normalize(q_comp, dim=1)
-        # k_comp = F.normalize(k_comp, dim=1)
-        queue = self.queue.clone().detach()
-        queue_label = self.queue_label.clone().detach()
-        self._dequeue_and_enqueue(k, k_label)
-        return q, k, queue, queue_label, q_reco, k_reco, q_id, q_reco_id, k_reco_id
+    def forward(self, imgs):
+        ft = self.extractor(imgs)
+        fi = self.BNNeck(ft)
+        fr = self.decoder(self.encoder(ft).half().float()) if random() < 0.5 else self.decoder(self.encoder(ft))
+        return ft, fi, fr

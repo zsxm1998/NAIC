@@ -4,10 +4,11 @@ import torch.nn.functional as F
 
 
 class SupConLoss(nn.Module):
-    def __init__(self, temperature=0.07, concat=False):
+    def __init__(self, temperature=0.07, concat=False, replace=False):
         super(SupConLoss, self).__init__()
         self.temperature = temperature
         self.concat = concat
+        self.replace = replace
 
     def forward(self, q, q_label, k, k_label):
         q_label = q_label.contiguous().view(-1,1)
@@ -20,7 +21,7 @@ class SupConLoss(nn.Module):
         logits = torch.matmul(q, k.T) / self.temperature
         logits = logits - torch.max(logits, dim=1, keepdim=True)[0].detach()
         exp_logits = torch.exp(logits)
-        if self.concat:
+        if self.concat or self.replace:
             mask = torch.scatter(mask, 1, torch.arange(mask.shape[0]).view(-1,1).to(mask.device), 0)
             exp_logits = torch.scatter(exp_logits, 1, torch.arange(exp_logits.shape[0]).view(-1,1).to(exp_logits.device), 0)
 

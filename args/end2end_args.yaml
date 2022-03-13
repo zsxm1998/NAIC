@@ -1,11 +1,13 @@
-info: End2End，ResNet50，256字节压缩，对比学习使用q去和k做loss，warmup cosine学习率，增加identity交叉熵loss，增加验证集
+info: End2End，ResNet50，64字节压缩，extractor输出加fc到128维度且不归一化，BNNeck加上BN，Decoder去掉最后的LeakyRelu，所有的Relu都替换为LeakyRelu，MoCo的foward以0.5的概率随机对encoder输出转为half进行截断
 model_depth: 50
-byte_rate: 256
-device: 2
-epochs: 100
+feature_dim: 128
+byte_rate: 64
+device: 1
+epochs: 120
+warm_up_step: 10
 early_stopping: 0
 batch_size: 128
-lr: 0.1
+lr: 0.001
 source: /nfs3-p2/zsxm/naic/rematch/train/
 save_cp: false
 load_model: False

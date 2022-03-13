@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 def read_feature_file(path: str) -> np.ndarray:
-    return np.fromfile(path, dtype='<f4')[:512]
+    return np.fromfile(path, dtype='<f4')
 
 
 def reid(bytes_rate):

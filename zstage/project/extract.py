@@ -143,7 +143,6 @@ class ResNetEncoder(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(ResNetEncoder, self).__init__()
-        self.fc = None
         self.n_channels = n_channels
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -235,10 +234,7 @@ class ResNetEncoder(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
-        if self.fc is None:
-            return self._forward_impl(x)
-        else:
-            return self.fc(self._forward_impl(x))
+        return F.normalize(self._forward_impl(x), dim=1)
 
 
 def resnet_encoder18(**kwargs: Any) -> ResNetEncoder:
@@ -308,17 +304,19 @@ def extract():
     os.makedirs(fea_dir, exist_ok=True)
     dataset = ImageDataset(img_dir)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=128, num_workers=8)
-    encoder = resnet_encoder(34)
-    encoder.load_state_dict(torch.load('project/Encoder_img.pth'))
+    extractor = resnet_encoder(50)
+    extractor.load_state_dict(torch.load('project/Extractor_best.pth'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    encoder.to(device)
-    encoder.eval()
+    extractor.to(device)
+    extractor.eval()
     for imgs, basenames in dataloader:
         imgs = imgs.to(device)
-        features = encoder(imgs)
-        features = features.cpu()
-        zfeatrues = torch.zeros(features.shape[0], 2048, dtype=features.dtype)
-        zfeatrues[:, :512] = features
-        write_feature_file(zfeatrues.numpy(), basenames, fea_dir)
+        features = extractor(imgs)
+        # features = features.cpu()
+        # zfeatrues = torch.zeros(features.shape[0], 2048, dtype=features.dtype)
+        # zfeatrues[:, :512] = features
+        # write_feature_file(zfeatrues.numpy(), basenames, fea_dir)
+        features = features.cpu().numpy()
+        write_feature_file(features, basenames, fea_dir)
 
     print('Extraction Done')

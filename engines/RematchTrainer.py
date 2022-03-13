@@ -9,15 +9,15 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch import optim
 
-from trainers.BaseTrainer import BaseTrainer
-from datasets.preliminary_dataset import PreliminaryDataset, PreliminaryBatchSampler, preliminary_collate_fn
-from models.mlp import MLP_MoCo
+from .BaseTrainer import BaseTrainer
+from datasets.rematch_dataset import RematchDataset, RematchBatchSampler, rematch_collate_fn
+from models.embedding import MoCo
 from losses.supcon import SupConLoss
 from losses.reconstruction import L2ReconstructionLoss, ExpReconstructionLoss, EnlargeReconstructionLoss
 
-class PreliminaryTrainer(BaseTrainer):
-    def __init__(self, opt_file='args/preliminary_args.yaml'):
-        super(PreliminaryTrainer, self).__init__(checkpoint_root='MLP')
+class RematchTrainer(BaseTrainer):
+    def __init__(self, opt_file='args/rematch_args.yaml'):
+        super(RematchTrainer, self).__init__(checkpoint_root='Rematch')
 
         with open(opt_file) as f:
             opt = yaml.safe_load(f)
@@ -35,25 +35,24 @@ class PreliminaryTrainer(BaseTrainer):
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.logger.info(f'Using device {self.device}')
 
-        self.net = MLP_MoCo(463)
+        self.net = MoCo(50)
         if opt.load_model:
             self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
             self.logger.info(f'Model loaded from {opt.load_model}')
         self.net.to(device=self.device)
 
-        self.train_dataset = PreliminaryDataset(opt.source, memory=True)
+        self.train_dataset = RematchDataset(opt.source)
         self.n_train = len(self.train_dataset)
         self.train_loader = DataLoader(self.train_dataset,
-                                       batch_sampler=PreliminaryBatchSampler(self.train_dataset, opt.batch_size),
-                                       collate_fn=preliminary_collate_fn,
+                                       batch_sampler=RematchBatchSampler(self.train_dataset, opt.batch_size),
+                                       collate_fn=rematch_collate_fn,
                                        num_workers=8, 
                                        pin_memory=True)
 
         self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr)
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
 
-        self.criterion_c = SupConLoss()
-        self.criterion_r = EnlargeReconstructionLoss()
+        self.criterion = SupConLoss(concat=False)
 
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp
@@ -77,25 +76,19 @@ class PreliminaryTrainer(BaseTrainer):
         for epoch in range(self.epochs):
             try:
                 self.net.train()
-                epoch_loss, epoch_c_loss, epoch_r_loss = 0, 0, 0
+                epoch_loss = 0
                 with tqdm(total=self.n_train, desc=f'Epoch {epoch + 1}/{self.epochs}', unit='q') as pbar:
                     for in_q, in_k, q_label, k_label in self.train_loader:
                         global_step += 1
                         in_q, in_k, q_label, k_label= in_q.to(self.device), in_k.to(self.device), q_label.to(self.device), k_label.to(self.device)
 
-                        q, k, queue, queue_label, reconstruct_q, reconstruct_k = self.net(in_q, in_k, k_label)
+                        q, k, queue, queue_label = self.net(in_q, in_k, k_label)
                         k, k_label = torch.cat([k, queue]), torch.cat([k_label, queue_label])
 
-                        c_loss = torch.zeros(1).to(self.device)#self.criterion_c(q, q_label, k, k_label)
-                        r_loss = self.criterion_r(reconstruct_q, in_q)
-                        loss = c_loss + r_loss
-                        self.writer.add_scalar('Train_Loss/contrastive_loss', c_loss.item(), global_step)
-                        self.writer.add_scalar('Train_Loss/reconstruction_loss', r_loss.item(), global_step)
+                        loss = self.criterion(q, q_label, k, k_label)
                         self.writer.add_scalar('Train_Loss/loss', loss.item(), global_step)
-                        epoch_c_loss += c_loss.item() * in_q.size(0)
-                        epoch_r_loss += r_loss.item() * in_q.size(0)
                         epoch_loss += loss.item() * in_q.size(0)
-                        pbar.set_postfix(OrderedDict(**{'loss (batch)': loss.item(), 'c_loss':c_loss.item(), 'r_loss': r_loss.item()}))
+                        pbar.set_postfix(OrderedDict(**{'loss ': loss.item()}))
 
                         self.optimizer.zero_grad()
                         loss.backward()
@@ -104,7 +97,7 @@ class PreliminaryTrainer(BaseTrainer):
 
                         pbar.update(in_q.shape[0])
 
-                self.logger.info(f'Train epoch {epoch + 1} loss: {epoch_loss/self.n_train}, c_loss: {epoch_c_loss/self.n_train}, r_loss: {epoch_r_loss/self.n_train}')
+                self.logger.info(f'Train epoch {epoch + 1} loss: {epoch_loss/self.n_train}')
 
                 for tag, value in self.net.named_parameters():
                     tag = tag.replace('.', '/')
@@ -143,4 +136,4 @@ class PreliminaryTrainer(BaseTrainer):
             self.logger.info('Last model saved !')
 
     def __del__(self):
-        super(PreliminaryTrainer, self).__del__()
+        super(RematchTrainer, self).__del__()

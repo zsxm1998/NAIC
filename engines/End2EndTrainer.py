@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch import optim
 
-from trainers.BaseTrainer import BaseTrainer
+from .BaseTrainer import BaseTrainer
 from datasets.rematch_dataset import RematchDataset, RematchBatchSampler, rematch_collate_fn, RematchEvalDataset
 from models.end2end import MoCo
 from losses.supcon import SupConLoss
@@ -55,7 +55,7 @@ class End2EndTrainer(BaseTrainer):
                                      num_workers=8, 
                                      pin_memory=True)
 
-        self.net = MoCo(opt.model_depth, id_num=len(self.train_dataset.datas), dim=int(opt.byte_rate//2))
+        self.net = MoCo(opt.model_depth, id_num=len(self.train_dataset.datas), extractor_out_dim=opt.feature_dim, compress_dim=int(opt.byte_rate//2))
         if opt.load_model:
             self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
             self.logger.info(f'Model loaded from {opt.load_model}')
@@ -65,7 +65,7 @@ class End2EndTrainer(BaseTrainer):
         #                              {'params':list(self.net.encoder_q.parameters())+list(self.net.decoder.parameters()), 'lr':0.001}], lr=opt.lr)
         self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr)
         #self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
-        self.scheduler = CosineAnnealingWithWarmUpLR(self.optimizer, T_total=opt.epochs, eta_min=1e-8, warm_up_lr=0.001, warm_up_step=3)
+        self.scheduler = CosineAnnealingWithWarmUpLR(self.optimizer, T_total=opt.epochs, eta_min=1e-8, warm_up_lr=opt.lr/100, warm_up_step=opt.warm_up_step)
 
         self.criterion_c = SupConLoss(concat=False)
         self.criterion_r = L2ReconstructionLoss()
@@ -131,7 +131,7 @@ class End2EndTrainer(BaseTrainer):
                 epoch_r_loss /= r_loss_count
                 epoch_i_loss /= i_loss_count
                 epoch_loss = epoch_c_loss + epoch_r_loss + epoch_i_loss
-                self.logger.info(f'Train epoch {epoch + 1} loss: {epoch_loss}, contrastive loss: {epoch_c_loss}, reconstruction loss: {epoch_r_loss}, identity loss: {epoch_i_loss}')
+                self.logger.info(f'Train epoch {epoch+1} loss: {epoch_loss}, contrastive loss: {epoch_c_loss}, reconstruction loss: {epoch_r_loss}, identity loss: {epoch_i_loss}')
 
                 for tag, value in self.net.named_parameters():
                     tag = tag.replace('.', '/')
@@ -143,28 +143,32 @@ class End2EndTrainer(BaseTrainer):
 
                 mAP, reconstruction_loss = self.evaluate()
                 val_score = 0.5 * mAP + 0.5 * np.exp(-reconstruction_loss)
+                self.logger.info(f'Train epoch {epoch+1} val_score: {val_score}, mAP: {mAP}, reconstruction_loss:{reconstruction_loss}')
+                self.writer.add_scalar('Val/val_score', val_score, global_step)
+                self.writer.add_scalar('Val/mAP', mAP, global_step)
+                self.writer.add_scalar('Val/reconstruction_loss', reconstruction_loss, global_step)
 
                 self.scheduler.step()
 
                 if self.save_cp:
                     torch.save(self.net.state_dict(), self.checkpoint_dir + f'Net_epoch{epoch + 1}.pth')
                     torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + f'Extractor_epoch{epoch + 1}.pth')
-                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.net.compress_dim}_epoch{epoch + 1}.pth')
-                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.net.compress_dim}_epoch{epoch + 1}.pth')
+                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.byte_rate}_epoch{epoch + 1}.pth')
+                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.byte_rate}_epoch{epoch + 1}.pth')
                     self.logger.info(f'Checkpoint {epoch + 1} saved !')
                 else:
                     torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_last.pth')
                     torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + 'Extractor_last.pth')
-                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.net.compress_dim}_last.pth')
-                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.net.compress_dim}_last.pth')
+                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.byte_rate}_last.pth')
+                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.byte_rate}_last.pth')
                     self.logger.info('Last model saved !')
 
                 if val_score > best_val_score:
-                    best_val_score = epoch_loss
+                    best_val_score = val_score
                     torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_best.pth')
                     torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + 'Extractor_best.pth')
-                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.net.compress_dim}_best.pth')
-                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.net.compress_dim}_best.pth')
+                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.byte_rate}_best.pth')
+                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.byte_rate}_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
                 else:
@@ -181,8 +185,8 @@ class End2EndTrainer(BaseTrainer):
         if not self.save_cp:
             torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_last.pth')
             torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + 'Extractor_last.pth')
-            torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.net.compress_dim}_last.pth')
-            torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.net.compress_dim}_last.pth')
+            torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.byte_rate}_last.pth')
+            torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.byte_rate}_last.pth')
             self.logger.info('Last model saved !')
 
     @torch.no_grad()

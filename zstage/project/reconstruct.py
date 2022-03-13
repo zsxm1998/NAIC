@@ -18,14 +18,22 @@ def write_feature_file(fea: np.ndarray, path: str):
 
 
 class FeatureDataset(Dataset):
-    def __init__(self, file_dir):
+    def __init__(self, file_dir, bytes_rate):
         self.query_fea_paths = glob.glob(os.path.join(file_dir, '*.*'))
+        if bytes_rate == 64:
+            self.dtype_str = '<f2'
+        elif bytes_rate == 128:
+            self.dtype_str = '<f4'
+        elif bytes_rate == 256:
+            self.dtype_str = '<f8'
+        else:
+            raise NotImplementedError(f'reconstruct FeatureDataset bytes_rate error!{bytes_rate}{type(bytes_rate)}')
 
     def __len__(self):
         return len(self.query_fea_paths)
 
     def __getitem__(self, index):
-        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f2')).float()
+        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype=self.dtype_str)).float()
         basename = os.path.splitext(os.path.basename(self.query_fea_paths[index]))[0]
         return vector, basename
 
@@ -52,31 +60,32 @@ class Decoder(nn.Module):
         x = self.relu(self.dn2(self.dl2(x)))
         x = self.relu(self.dn3(self.dl3(x)))
         x = self.relu(self.dn4(self.dl4(x)))
-        out = self.dl5(x)
-        return out
+        return self.dl5(x)
 
 
 @torch.no_grad()
 def reconstruct(bytes_rate):
+    if not isinstance(bytes_rate, int):
+        bytes_rate = int(bytes_rate)
     compressed_query_fea_dir = 'compressed_query_feature/{}'.format(bytes_rate)
     reconstructed_query_fea_dir = 'reconstructed_query_feature/{}'.format(bytes_rate)
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
-    net = Decoder(int(int(bytes_rate)/2), 512)
-    net.load_state_dict(torch.load(f'project/Decoder_{bytes_rate}.pth', map_location=torch.device('cpu')))
+    net = Decoder(32, 2048)
+    net.load_state_dict(torch.load(f'project/Decoder_32_best.pth', map_location=torch.device('cpu')))
     net.eval()
 
-    featuredataset = FeatureDataset(compressed_query_fea_dir)
+    featuredataset = FeatureDataset(compressed_query_fea_dir, bytes_rate=bytes_rate)
     featureloader = DataLoader(featuredataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     for vector, basename in featureloader:
         reconstructed = net(vector)
-        expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
-        expand_r[:, :512] = reconstructed
+        # expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
+        # expand_r[:, :512] = reconstructed
 
         for i, bname in enumerate(basename):
             reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
             with open(reconstructed_fea_path, 'wb') as bf:
-                bf.write(expand_r[i].numpy().tobytes())
+                bf.write(reconstructed[i].numpy().tobytes())
 
     print('Reconstruction Done')

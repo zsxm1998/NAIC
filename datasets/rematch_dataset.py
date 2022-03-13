@@ -133,12 +133,12 @@ def rematch_collate_fn(input_list): #[(q_list, k_list, label), (q_list, k_list, 
 
 
 class RematchEvalDataset(Dataset):
-    def __init__(self, dir, transform=None):
+    def __init__(self, dir, label_file='val_list.txt', transform=None):
         self.file_dir = join(dir, 'train_picture')
         self.transform = transform if transform is not None else T.ToTensor()
         self.datas = []
 
-        with open(join(dir, 'val_list.txt'), 'r') as f:
+        with open(join(dir, label_file), 'r') as f:
             lines = f.readlines()
         for line in lines:
             elems = line.split()

@@ -1,0 +1,14 @@
+info: EndToEnd，ResNet50，32维压缩，Extractor不归一化，BNNect里BN不affine
+model_depth: 50
+feature_dim: 128
+compress_dim: 32
+device: 0
+epochs: 120
+early_stopping: 0
+batch_size: 128
+lr: 0.00035
+weight_decay: 0.0005
+warm_up_step: 10
+source: /nfs3-p2/zsxm/naic/rematch/train/
+save_cp: false
+load_model: False

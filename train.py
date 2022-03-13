@@ -1,3 +1,3 @@
-from trainers.End2EndTrainer import End2EndTrainer
+from engines.EndToEndTrainer import EndToEndTrainer
 
-End2EndTrainer().train()
+EndToEndTrainer().train()

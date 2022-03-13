@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch import optim
 
-from trainers.BaseTrainer import BaseTrainer
+from .BaseTrainer import BaseTrainer
 from datasets.reconstruction_dataset import ReconstructionDataset
 from models.autoencoder import AutoEncoderMLP
 from models.conv import AutoEncoderConv
