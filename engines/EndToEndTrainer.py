@@ -110,6 +110,7 @@ class EndToEndTrainer(BaseTrainer):
     def train(self):
         global_step = 0
         best_val_score = -1 #float('inf')
+        best_mAP = -1
         useless_epoch_count = 0
         for epoch in range(self.epochs):
             try:
@@ -210,6 +211,10 @@ class EndToEndTrainer(BaseTrainer):
                     useless_epoch_count = 0
                 else:
                     useless_epoch_count += 1
+
+                if mAP > best_mAP:
+                    best_mAP = mAP
+                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_mAP_best.pth')
 
                 if self.early_stopping and useless_epoch_count == self.early_stopping:
                     self.logger.info(f'There are {useless_epoch_count} useless epochs! Early Stop Training!')
