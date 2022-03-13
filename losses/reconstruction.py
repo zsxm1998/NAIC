@@ -9,7 +9,7 @@ class L2ReconstructionLoss(nn.Module):
 
     def forward(self, reconstructed, origin):
         assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
-        return torch.linalg.vector_norm(reconstructed-origin, dim=1, ord=2).mean()
+        return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
 
 
 class ExpReconstructionLoss(nn.Module):
