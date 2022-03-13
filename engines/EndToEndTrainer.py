@@ -59,8 +59,9 @@ class EndToEndTrainer(BaseTrainer):
 
         self.train_dataset = TripletDataset(opt.source, label_file='train_list.txt', transform=self.train_transform)
         self.n_train = len(self.train_dataset)
+        self.train_sampler = RandomIdentitySampler(self.train_dataset, opt.batch_size, num_instances=4)
         self.train_loader = DataLoader(self.train_dataset,
-                                       sampler=RandomIdentitySampler(self.train_dataset, opt.batch_size, num_instances=4),
+                                       sampler=self.train_sampler,
                                        batch_size=opt.batch_size,
                                        num_workers=8, 
                                        pin_memory=True)
@@ -115,7 +116,7 @@ class EndToEndTrainer(BaseTrainer):
                 self.net.train()
                 epoch_t_loss, epoch_cen_loss, epoch_i_loss, epoch_re_loss, epoch_con_loss = 0, 0, 0, 0, 0
                 epoch_count = 0
-                with tqdm(total=self.n_train, desc=f'Epoch {epoch + 1}/{self.epochs}', unit='q') as pbar:
+                with tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img') as pbar:
                     for imgs, labels in self.train_loader:
                         global_step += 1
                         imgs, labels = imgs.to(self.device), labels.to(self.device)
@@ -194,16 +195,16 @@ class EndToEndTrainer(BaseTrainer):
                     self.logger.info(f'Checkpoint {epoch + 1} saved !')
                 else:
                     torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_last.pth')
-                    torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
-                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
+                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
+                    torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
                     torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
                     self.logger.info('Last model saved !')
 
                 if val_score > best_val_score:
                     best_val_score = val_score
                     torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_best.pth')
-                    torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_best.pth')
-                    torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_best.pth')
+                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_best.pth')
+                    torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_best.pth')
                     torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
@@ -220,8 +221,8 @@ class EndToEndTrainer(BaseTrainer):
 
         if not self.save_cp:
             torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_last.pth')
-            torch.save(self.net.extractor_q.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
-            torch.save(self.net.encoder_q.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
+            torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
+            torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
             torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
             self.logger.info('Last model saved !')
 
