@@ -332,7 +332,7 @@ def extract():
 
     dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=128, num_workers=8)
-    extractor = resnet_encoder(50, n_outputs=128)
+    extractor = resnet_encoder(50, n_outputs=2048)
     extractor.load_state_dict(torch.load('project/Extractor_2048_best.pth'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     extractor.to(device)
