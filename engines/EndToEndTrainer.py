@@ -234,7 +234,7 @@ class EndToEndTrainer(BaseTrainer):
             torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
             self.logger.info('Last model saved !')
 
-    @torch.no_grad()
+    @torch.no_grad() #使用压缩向量计算ACC_reid和重构L2距离
     def evaluate(self):
         self.net.eval()
 
@@ -249,8 +249,8 @@ class EndToEndTrainer(BaseTrainer):
                 featrues_reco = self.net.decoder(self.net.encoder(features).half().float())
                 reconstruction_loss += self.criterion_recons(featrues_reco, features).item() * labels.shape[0]
 
-                features = F.normalize(features, dim=1).cpu().numpy()
-                feature_list.append(features)
+                featrues_reco = F.normalize(featrues_reco, dim=1).cpu().numpy()
+                feature_list.append(featrues_reco)
 
                 pbar.update(imgs.shape[0])
 
@@ -261,29 +261,83 @@ class EndToEndTrainer(BaseTrainer):
         dists = np.matmul(features, features.T)
         ranks = np.argsort(-dists, axis=1)
 
-        mAP = 0
+        acc1, mAP = 0, 0
         for i, rank in enumerate(ranks):
             ap = 0
             rank = rank[rank!=i]
             label = labels[i]
             rank_label = np.take_along_axis(labels, rank, axis=0)
+            if rank_label[0] == label:
+               acc1 += 1 
             correct_rank_idx = np.argwhere(rank_label==label).flatten()
+            correct_rank_idx = correct_rank_idx[correct_rank_idx<100]
             n_correct = len(correct_rank_idx)
-            for j in range(n_correct):
+            if n_correct > 0:
                 d_recall = 1 / n_correct
-                precision = (j+1) / (correct_rank_idx[j]+1)
-                if correct_rank_idx[j] != 0:
-                    old_precision = j / correct_rank_idx[j]
-                else:
-                    old_precision = 1
-                ap = ap + d_recall * (old_precision+precision) / 2
+                for j in range(n_correct):
+                    precision = (j+1) / (correct_rank_idx[j]+1)
+                    ap += d_recall * precision
             mAP += ap
         
-        mAP /= ranks.shape[0]
         reconstruction_loss /= ranks.shape[0]
+        acc1 /= ranks.shape[0]
+        mAP /= ranks.shape[0]
+        ACC_reid = (acc1 + mAP) / 2
 
         self.net.train()
-        return mAP, reconstruction_loss
+        return ACC_reid, reconstruction_loss
+
+    # @torch.no_grad() # 使用未压缩向量计算mAP和reconstruction loss
+    # def evaluate(self):
+    #     self.net.eval()
+
+    #     feature_list, label_list = [], []
+    #     reconstruction_loss = 0
+    #     with tqdm(total=self.n_val, desc=f'Validation round', unit='vector', leave=False) as pbar:
+    #         for imgs, labels in self.val_loader:
+    #             imgs = imgs.to(self.device)
+    #             label_list.append(labels.numpy())
+            
+    #             features = self.net.extractor(imgs)
+    #             featrues_reco = self.net.decoder(self.net.encoder(features).half().float())
+    #             reconstruction_loss += self.criterion_recons(featrues_reco, features).item() * labels.shape[0]
+
+    #             features = F.normalize(features, dim=1).cpu().numpy()
+    #             feature_list.append(features)
+
+    #             pbar.update(imgs.shape[0])
+
+    #     features = np.concatenate(feature_list, axis=0)
+    #     labels = np.concatenate(label_list, axis=0)
+    #     del feature_list, label_list
+
+    #     dists = np.matmul(features, features.T)
+    #     ranks = np.argsort(-dists, axis=1)
+
+    #     mAP = 0
+    #     for i, rank in enumerate(ranks):
+    #         ap = 0
+    #         rank = rank[rank!=i]
+    #         label = labels[i]
+    #         rank_label = np.take_along_axis(labels, rank, axis=0)
+    #         correct_rank_idx = np.argwhere(rank_label==label).flatten()
+    #         n_correct = len(correct_rank_idx)
+    #         if n_correct > 0:
+    #             d_recall = 1 / n_correct
+    #             for j in range(n_correct):
+    #                 precision = (j+1) / (correct_rank_idx[j]+1)
+    #                 if correct_rank_idx[j] != 0:
+    #                     old_precision = j / correct_rank_idx[j]
+    #                 else:
+    #                     old_precision = 1
+    #                 ap += d_recall * (old_precision+precision) / 2
+    #         mAP += ap
+        
+    #     mAP /= ranks.shape[0]
+    #     reconstruction_loss /= ranks.shape[0]
+
+    #     self.net.train()
+    #     return mAP, reconstruction_loss
 
     def __del__(self):
         super(EndToEndTrainer, self).__del__()
