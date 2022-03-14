@@ -136,6 +136,7 @@ class ResNetEncoder(nn.Module):
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
         n_channels: int = 3,
+        n_outputs: int = 128,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
@@ -169,9 +170,10 @@ class ResNetEncoder(nn.Module):
                                        dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
                                        dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, #使用baseline提到的last stride=1的trick
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(512 * block.expansion, n_outputs)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -231,10 +233,10 @@ class ResNetEncoder(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        return x
+        return self.fc(x)
 
     def forward(self, x: Tensor) -> Tensor:
-        return F.normalize(self._forward_impl(x), dim=1)
+        return self._forward_impl(x)
 
 
 def resnet_encoder18(**kwargs: Any) -> ResNetEncoder:
@@ -284,10 +286,10 @@ def write_feature_file(features, basenames, path):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, dir):
+    def __init__(self, dir, transform=None):
         self.img_paths = glob.glob(os.path.join(dir, '*.*'))
         assert(len(self.img_paths) != 0)
-        self.transform = T.ToTensor()
+        self.transform = T.Compose([T.Resize([256, 128]), T.ToTensor()]) if transform is None else transform
 
     def __len__(self):
         return len(self.img_paths)
@@ -302,21 +304,47 @@ def extract():
     img_dir = 'image'
     fea_dir = 'feature'
     os.makedirs(fea_dir, exist_ok=True)
-    dataset = ImageDataset(img_dir)
+
+    val_dataset = ImageDataset(img_dir)
+    val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=128, num_workers=8)
+    img_count = 0
+    rgb = torch.zeros(3)
+    for imgs, basenames in val_dataloader:
+        img_count += imgs.shape[0]
+        rgb += imgs.sum(dim=(0,2,3))
+    img_count *= 128*256
+    rgb /= img_count
+    mean = rgb
+    rgb = rgb[None, :, None, None]
+    var = torch.zeros(3)
+    for imgs, basenames in val_dataloader:
+        var += torch.pow(imgs - rgb, 2).sum(dim=(0,2,3))
+    var /= img_count
+    std = var.sqrt()
+    mean = mean.tolist()
+    std = std.tolist()
+
+    transform = T.Compose([
+        T.Resize([256, 128]),
+        T.ToTensor(),
+        T.Normalize(mean=mean, std=std),
+    ])
+
+    dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=128, num_workers=8)
-    extractor = resnet_encoder(50)
-    extractor.load_state_dict(torch.load('project/Extractor_best.pth'))
+    extractor = resnet_encoder(50, n_outputs=128)
+    extractor.load_state_dict(torch.load('project/Extractor_128_best.pth'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     extractor.to(device)
     extractor.eval()
     for imgs, basenames in dataloader:
         imgs = imgs.to(device)
         features = extractor(imgs)
-        # features = features.cpu()
-        # zfeatrues = torch.zeros(features.shape[0], 2048, dtype=features.dtype)
-        # zfeatrues[:, :512] = features
-        # write_feature_file(zfeatrues.numpy(), basenames, fea_dir)
-        features = features.cpu().numpy()
-        write_feature_file(features, basenames, fea_dir)
+        features = features.cpu()
+        zfeatrues = torch.zeros(features.shape[0], 2048, dtype=features.dtype)
+        zfeatrues[:, :128] = features
+        write_feature_file(zfeatrues.numpy(), basenames, fea_dir)
+        # features = features.cpu().numpy()
+        # write_feature_file(features, basenames, fea_dir)
 
     print('Extraction Done')

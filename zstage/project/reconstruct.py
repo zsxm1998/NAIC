@@ -25,7 +25,7 @@ class FeatureDataset(Dataset):
         elif bytes_rate == 128:
             self.dtype_str = '<f4'
         elif bytes_rate == 256:
-            self.dtype_str = '<f8'
+            self.dtype_str = '<f2'
         else:
             raise NotImplementedError(f'reconstruct FeatureDataset bytes_rate error!{bytes_rate}{type(bytes_rate)}')
 
@@ -44,23 +44,29 @@ class Decoder(nn.Module):
         self.intermediate_dim = intermediate_dim
         self.output_dim = output_dim
 
-        self.relu = nn.ReLU(inplace=True)
-        self.dl1 = nn.Linear(intermediate_dim, 512)
-        self.dn1 = nn.BatchNorm1d(512)
-        self.dl2 = nn.Linear(512, 1024)
-        self.dn2 = nn.BatchNorm1d(1024)
-        self.dl3 = nn.Linear(1024, 2048)
-        self.dn3 = nn.BatchNorm1d(2048)
-        self.dl4 = nn.Linear(2048, 4096)
-        self.dn4 = nn.BatchNorm1d(4096)
-        self.dl5 = nn.Linear(4096, output_dim)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.dl1 = nn.Linear(intermediate_dim, 256)
+        self.dn1 = nn.BatchNorm1d(256)
+        self.dl2 = nn.Linear(256, 512)
+        self.dn2 = nn.BatchNorm1d(512)
+        self.dl3 = nn.Linear(512, 1024)
+        self.dn3 = nn.BatchNorm1d(1024)
+        self.dp3 = nn.Dropout(0.05)
+        self.dl4 = nn.Linear(1024, 2048)
+        self.dn4 = nn.BatchNorm1d(2048)
+        self.dp4 = nn.Dropout(0.1)
+        self.dl5 = nn.Linear(2048, 4096)
+        self.dn5 = nn.BatchNorm1d(4096)
+        self.dp5 = nn.Dropout(0.2)
+        self.dl6 = nn.Linear(4096, output_dim)
 
     def forward(self, x):
         x = self.relu(self.dn1(self.dl1(x)))
         x = self.relu(self.dn2(self.dl2(x)))
-        x = self.relu(self.dn3(self.dl3(x)))
-        x = self.relu(self.dn4(self.dl4(x)))
-        return self.dl5(x)
+        x = self.dp3(self.relu(self.dn3(self.dl3(x))))
+        x = self.dp4(self.relu(self.dn4(self.dl4(x))))
+        x = self.dp5(self.relu(self.dn5(self.dl5(x))))
+        return self.dl6(x)
 
 
 @torch.no_grad()
@@ -71,21 +77,30 @@ def reconstruct(bytes_rate):
     reconstructed_query_fea_dir = 'reconstructed_query_feature/{}'.format(bytes_rate)
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
-    net = Decoder(32, 2048)
-    net.load_state_dict(torch.load(f'project/Decoder_32_best.pth', map_location=torch.device('cpu')))
-    net.eval()
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    decoder = Decoder(32, 128)
+    decoder.load_state_dict(torch.load(f'project/Decoder_32_best.pth'))
+    decoder.to(device)
+    decoder.eval()
 
     featuredataset = FeatureDataset(compressed_query_fea_dir, bytes_rate=bytes_rate)
     featureloader = DataLoader(featuredataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     for vector, basename in featureloader:
-        reconstructed = net(vector)
-        # expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
-        # expand_r[:, :512] = reconstructed
+        if bytes_rate != 256:
+            vector = vector.to(device)
+            reconstructed = decoder(vector).cpu()
+        else:
+            reconstructed = vector
+        
+        expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
+        expand_r[:, :128] = reconstructed
+        expand_r = expand_r.numpy().astype('<f4')
 
         for i, bname in enumerate(basename):
             reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
-            with open(reconstructed_fea_path, 'wb') as bf:
-                bf.write(reconstructed[i].numpy().tobytes())
+            # with open(reconstructed_fea_path, 'wb') as bf:
+            #     bf.write(expand_r[i].numpy().tobytes())
+            expand_r[i].tofile(reconstructed_fea_path)
 
     print('Reconstruction Done')

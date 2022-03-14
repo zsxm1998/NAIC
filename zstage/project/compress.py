@@ -16,7 +16,7 @@ class FeatureDataset(Dataset):
         return len(self.query_fea_paths)
 
     def __getitem__(self, index):
-        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))
+        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))[:128]
         basename = os.path.splitext(os.path.basename(self.query_fea_paths[index]))[0]
         return vector, basename
 
@@ -30,9 +30,10 @@ class Encoder(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.el1 = nn.Linear(input_dim, input_dim)
         self.el2 = nn.Linear(input_dim, intermediate_dim)
+        self.en2 = nn.BatchNorm1d(intermediate_dim)
 
     def forward(self, x):
-        return F.normalize((self.el2(self.relu(self.el1(x)))), dim=1)
+        return self.en2(self.el2(self.relu(self.el1(x))))
 
 
 @torch.no_grad()
@@ -43,22 +44,30 @@ def compress(bytes_rate):
     compressed_query_fea_dir = 'compressed_query_feature/{}'.format(bytes_rate)
     os.makedirs(compressed_query_fea_dir, exist_ok=True)
 
-    net = Encoder(32, 2048)
-    net.load_state_dict(torch.load(f'project/Encoder_32_best.pth', map_location=torch.device('cpu')))
-    net.eval()
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    encoder = Encoder(32, 128)
+    encoder.load_state_dict(torch.load(f'project/Encoder_32_best.pth'))
+    encoder.to(device)
+    encoder.eval()
 
     featuredataset = FeatureDataset(query_fea_dir)
     featureloader = DataLoader(featuredataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     for vector, basename in featureloader:
-        compressed = net(vector)
-        if bytes_rate == 64:
-            compressed = compressed.half()
-        elif bytes_rate == 256:
-            compressed = compressed.double()
+        if bytes_rate != 256:
+            vector = vector.to(device)
+            compressed = encoder(vector).cpu()
+            if bytes_rate == 64:
+                compressed = compressed.half().numpy().astype('<f2')
+            else:
+                compressed = compressed.numpy().astype('<f4')
+        else:
+            compressed = vector.half().numpy().astype('<f2')
+        
         for i, bname in enumerate(basename):
             compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-            with open(compressed_fea_path, 'wb') as bf:
-                bf.write(compressed[i].numpy().tobytes())
+            # with open(compressed_fea_path, 'wb') as bf:
+            #     bf.write(compressed[i].numpy().tobytes())
+            compressed[i].tofile(compressed_fea_path)
 
     print('Compression Done')
