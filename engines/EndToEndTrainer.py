@@ -145,10 +145,11 @@ class EndToEndTrainer(BaseTrainer):
                         #epoch_con_loss += con_loss * labels.size(0)
                         epoch_count += labels.size(0)
                         pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
-                                         'triplet':t_loss.item(), 
+                                         'triplet': t_loss.item(), 
                                          'center': cen_loss.item(), 
                                          'identity': i_loss.item(),
                                          'reconstraction': re_loss.item(),
+                                         #'contrastive': con_loss.item(),
                                         }))
 
                         self.optimizer.zero_grad()
@@ -168,7 +169,9 @@ class EndToEndTrainer(BaseTrainer):
                                  f'triplet loss: {epoch_t_loss}, '
                                  f'center loss: {epoch_cen_loss}, '
                                  f'identity loss: {epoch_i_loss}, '
-                                 f'reconstruction loss: {epoch_re_loss}')
+                                 f'reconstruction loss: {epoch_re_loss}, '
+                                 #f'contrastive loss: {epoch_con_loss}'
+                                )
                 self.writer.add_scalar('Train_Loss/Epoch_Loss', epoch_loss, epoch+1)
 
                 for tag, value in self.net.named_parameters():
