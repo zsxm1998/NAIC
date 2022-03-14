@@ -264,7 +264,7 @@ class EndToEndTrainer(BaseTrainer):
         labels = np.concatenate(label_list, axis=0)
         del feature_list, label_list
         dists = torch.mm(features, features.T)
-        ranks = torch.argsort(dists, dim=1).cpu().numpy()
+        ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
         del dists
 
         acc1, mAP = 0, 0
