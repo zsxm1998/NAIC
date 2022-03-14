@@ -249,23 +249,23 @@ class EndToEndTrainer(BaseTrainer):
                 featrues_reco = self.net.decoder(self.net.encoder(features).half().float())
                 reconstruction_loss += self.criterion_recons(featrues_reco, features).item() * labels.shape[0]
 
-                featrues_reco = F.normalize(featrues_reco, dim=1)#.cpu().numpy()
+                featrues_reco = F.normalize(featrues_reco, dim=1).cpu().numpy()
                 feature_list.append(featrues_reco)
 
                 pbar.update(imgs.shape[0])
 
-        # features = np.concatenate(feature_list, axis=0)
-        # labels = np.concatenate(label_list, axis=0)
-        # del feature_list, label_list
-        # dists = np.matmul(features, features.T)
-        # ranks = np.argsort(-dists, axis=1)
-        # del dists
-        features = torch.cat(feature_list, dim=0)
+        features = np.concatenate(feature_list, axis=0)
         labels = np.concatenate(label_list, axis=0)
         del feature_list, label_list
-        dists = torch.mm(features, features.T)
-        ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
+        dists = np.matmul(features, features.T)
+        ranks = np.argsort(-dists, axis=1)
         del dists
+        # features = torch.cat(feature_list, dim=0)
+        # labels = np.concatenate(label_list, axis=0)
+        # del feature_list, label_list
+        # dists = torch.mm(features, features.T)
+        # ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
+        # del dists
 
         acc1, mAP = 0, 0
         for i, rank in enumerate(ranks):
