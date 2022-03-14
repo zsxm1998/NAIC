@@ -110,7 +110,7 @@ class EndToEndTrainer(BaseTrainer):
     def train(self):
         global_step = 0
         best_val_score = -1 #float('inf')
-        best_mAP = -1
+        best_ACC_reid = -1
         useless_epoch_count = 0
         for epoch in range(self.epochs):
             try:
@@ -182,11 +182,11 @@ class EndToEndTrainer(BaseTrainer):
 
                 self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]['lr'], global_step)
 
-                mAP, reconstruction_loss = self.evaluate()
-                val_score = 0.5 * mAP + 0.5 * np.exp(-reconstruction_loss)
-                self.logger.info(f'Train epoch {epoch+1} val_score: {val_score}, mAP: {mAP}, reconstruction_loss:{reconstruction_loss}')
+                ACC_reid, reconstruction_loss = self.evaluate()
+                val_score = 0.8 * ACC_reid + 0.2 * np.exp(-reconstruction_loss)
+                self.logger.info(f'Train epoch {epoch+1} val_score: {val_score}, ACC_reid: {ACC_reid}, reconstruction_loss:{reconstruction_loss}')
                 self.writer.add_scalar('Val/val_score', val_score, global_step)
-                self.writer.add_scalar('Val/mAP', mAP, global_step)
+                self.writer.add_scalar('Val/ACC_reid', ACC_reid, global_step)
                 self.writer.add_scalar('Val/reconstruction_loss', reconstruction_loss, global_step)
 
                 self.scheduler.step()
@@ -215,9 +215,9 @@ class EndToEndTrainer(BaseTrainer):
                 else:
                     useless_epoch_count += 1
 
-                if mAP > best_mAP:
-                    best_mAP = mAP
-                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_mAP_best.pth')
+                if ACC_reid > best_ACC_reid:
+                    best_ACC_reid = ACC_reid
+                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_ACC_reid_best.pth')
 
                 if self.early_stopping and useless_epoch_count == self.early_stopping:
                     self.logger.info(f'There are {useless_epoch_count} useless epochs! Early Stop Training!')
@@ -249,17 +249,23 @@ class EndToEndTrainer(BaseTrainer):
                 featrues_reco = self.net.decoder(self.net.encoder(features).half().float())
                 reconstruction_loss += self.criterion_recons(featrues_reco, features).item() * labels.shape[0]
 
-                featrues_reco = F.normalize(featrues_reco, dim=1).cpu().numpy()
+                featrues_reco = F.normalize(featrues_reco, dim=1)#.cpu().numpy()
                 feature_list.append(featrues_reco)
 
                 pbar.update(imgs.shape[0])
 
-        features = np.concatenate(feature_list, axis=0)
+        # features = np.concatenate(feature_list, axis=0)
+        # labels = np.concatenate(label_list, axis=0)
+        # del feature_list, label_list
+        # dists = np.matmul(features, features.T)
+        # ranks = np.argsort(-dists, axis=1)
+        # del dists
+        features = torch.cat(feature_list, dim=0)
         labels = np.concatenate(label_list, axis=0)
         del feature_list, label_list
-
-        dists = np.matmul(features, features.T)
-        ranks = np.argsort(-dists, axis=1)
+        dists = torch.mm(features, features.T)
+        ranks = torch.argsort(dists, dim=1).cpu().numpy()
+        del dists
 
         acc1, mAP = 0, 0
         for i, rank in enumerate(ranks):
