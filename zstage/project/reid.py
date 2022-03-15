@@ -9,11 +9,11 @@ def read_feature_file(path: str) -> np.ndarray:
     return np.fromfile(path, dtype='<f4')[:128]
 
 
-def reid(bytes_rate):
+def reid(bytes_rate, root=''):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    reconstructed_query_fea_dir = 'reconstructed_query_feature/{}'.format(bytes_rate)
-    gallery_fea_dir = 'gallery_feature'
-    reid_results_path = 'reid_results/{}.json'.format(bytes_rate)
+    reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
+    gallery_fea_dir = os.path.join(root, 'gallery_feature')
+    reid_results_path = os.path.join(root, 'reid_results/{}.json'.format(bytes_rate))
     os.makedirs(os.path.dirname(reid_results_path), exist_ok=True)
 
     query_names = sorted(os.listdir(reconstructed_query_fea_dir))

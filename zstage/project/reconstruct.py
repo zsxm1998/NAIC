@@ -70,11 +70,11 @@ class Decoder(nn.Module):
 
 
 @torch.no_grad()
-def reconstruct(bytes_rate):
+def reconstruct(bytes_rate, root=''):
     if not isinstance(bytes_rate, int):
         bytes_rate = int(bytes_rate)
-    compressed_query_fea_dir = 'compressed_query_feature/{}'.format(bytes_rate)
-    reconstructed_query_fea_dir = 'reconstructed_query_feature/{}'.format(bytes_rate)
+    compressed_query_fea_dir = os.path.join(root, 'compressed_query_feature/{}'.format(bytes_rate))
+    reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

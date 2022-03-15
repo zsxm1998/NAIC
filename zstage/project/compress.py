@@ -37,11 +37,11 @@ class Encoder(nn.Module):
 
 
 @torch.no_grad()
-def compress(bytes_rate):
+def compress(bytes_rate, root=''):
     if not isinstance(bytes_rate, int):
         bytes_rate = int(bytes_rate)
-    query_fea_dir = 'query_feature'
-    compressed_query_fea_dir = 'compressed_query_feature/{}'.format(bytes_rate)
+    query_fea_dir = os.path.join(root, 'query_feature')
+    compressed_query_fea_dir = os.path.join(root, 'compressed_query_feature/{}'.format(bytes_rate))
     os.makedirs(compressed_query_fea_dir, exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

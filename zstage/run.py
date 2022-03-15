@@ -10,8 +10,8 @@ import numpy as np
 import torch.nn.functional as F
 import json
 
-# extract()
-# os.rename('feature', 'query_feature')
+extract(root='/nfs3-p1/zsxm/naic/rematch/test')
+os.rename('/nfs3-p1/zsxm/naic/rematch/test/feature', '/nfs3-p1/zsxm/naic/rematch/test/query_feature')
 
 # for byte_rate in ['64', '128', '256']:
 #     compress(byte_rate)
@@ -19,27 +19,27 @@ import json
 # for byte_rate in ['64', '128', '256']:
 #     reconstruct(byte_rate)
 
-class L2ReconstructionLoss(nn.Module):
-    def __init__(self):
-        super(L2ReconstructionLoss, self).__init__()
+# class L2ReconstructionLoss(nn.Module):
+#     def __init__(self):
+#         super(L2ReconstructionLoss, self).__init__()
 
-    def forward(self, reconstructed, origin):
-        assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
-        return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
+#     def forward(self, reconstructed, origin):
+#         assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
+#         return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
 
-file_list = sorted(os.listdir('query_feature'))
-feature_list = []
-for file in file_list:
-    feature_list.append(np.fromfile(os.path.join('query_feature', file), dtype='<f4')[:128])
-features = torch.from_numpy(np.stack(feature_list, axis=0))
-del feature_list
-for byte_rate in ['64', '128', '256']:
-    reconstruct_feature_list = []
-    for file in file_list:
-        reconstruct_feature_list.append(np.fromfile(os.path.join('/nfs3-p1/zsxm/naic/huffman/reconstructed_features', byte_rate, file), dtype='<f4')[:128])
-    reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
-    del reconstruct_feature_list
-    print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features))
+# file_list = sorted(os.listdir('query_feature'))
+# feature_list = []
+# for file in file_list:
+#     feature_list.append(np.fromfile(os.path.join('query_feature', file), dtype='<f4')[:128])
+# features = torch.from_numpy(np.stack(feature_list, axis=0))
+# del feature_list
+# for byte_rate in ['64', '128', '256']:
+#     reconstruct_feature_list = []
+#     for file in file_list:
+#         reconstruct_feature_list.append(np.fromfile(os.path.join('/nfs3-p1/zsxm/naic/huffman/reconstructed_features', byte_rate, file), dtype='<f4')[:128])
+#     reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
+#     del reconstruct_feature_list
+#     print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features))
 # byte_rate 64 L2 loss: tensor(0.1034)
 # byte_rate 128 L2 loss: tensor(0.1034)
 # byte_rate 256 L2 loss: tensor(5.8545e-05)
