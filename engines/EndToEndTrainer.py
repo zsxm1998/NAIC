@@ -128,28 +128,28 @@ class EndToEndTrainer(BaseTrainer):
                         cen_loss = self.criterion_center(ft, labels)
                         i_loss = self.criterion_identity(fi, labels)
                         re_loss = self.criterion_recons(fr, ft)
-                        #con_loss = self.criterion_contras(fr, labels, ft, labels)
+                        con_loss = self.criterion_triplet(fr, labels)[0] #self.criterion_contras(fr, labels, ft, labels)
 
-                        loss = t_loss + 0.0005*cen_loss + i_loss + re_loss #+ con_loss
+                        loss = t_loss + 0.0005*cen_loss + i_loss + re_loss + con_loss
                         
                         self.writer.add_scalar('Train_Loss/triplet_loss', t_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/center_loss', cen_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/identity_loss', i_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/reconstruction_loss', re_loss.item(), global_step)
-                        #self.writer.add_scalar('Train_Loss/contrastive_loss', con_loss.item(), global_step)
+                        self.writer.add_scalar('Train_Loss/contrastive_loss', con_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/Step_Loss', loss.item(), global_step)
                         epoch_t_loss += t_loss.item() * labels.size(0)
                         epoch_cen_loss += cen_loss.item() * labels.size(0)
                         epoch_i_loss += i_loss.item() * labels.size(0)
                         epoch_re_loss += re_loss * labels.size(0)
-                        #epoch_con_loss += con_loss * labels.size(0)
+                        epoch_con_loss += con_loss * labels.size(0)
                         epoch_count += labels.size(0)
                         pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
                                          'triplet': t_loss.item(), 
                                          'center': cen_loss.item(), 
                                          'identity': i_loss.item(),
                                          'reconstraction': re_loss.item(),
-                                         #'contrastive': con_loss.item(),
+                                         'contrastive': con_loss.item(),
                                         }))
 
                         self.optimizer.zero_grad()
@@ -163,14 +163,14 @@ class EndToEndTrainer(BaseTrainer):
                 epoch_cen_loss /= epoch_count
                 epoch_i_loss /= epoch_count
                 epoch_re_loss /= epoch_count
-                #epoch_con_loss /= epoch_count
-                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss + epoch_re_loss #+ epoch_con_loss
+                epoch_con_loss /= epoch_count
+                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss + epoch_re_loss + epoch_con_loss
                 self.logger.info(f'Train epoch {epoch+1} loss: {epoch_loss}, '
                                  f'triplet loss: {epoch_t_loss}, '
                                  f'center loss: {epoch_cen_loss}, '
                                  f'identity loss: {epoch_i_loss}, '
                                  f'reconstruction loss: {epoch_re_loss}, '
-                                 #f'contrastive loss: {epoch_con_loss}'
+                                 f'contrastive loss: {epoch_con_loss}'
                                 )
                 self.writer.add_scalar('Train_Loss/Epoch_Loss', epoch_loss, epoch+1)
 
@@ -238,7 +238,7 @@ class EndToEndTrainer(BaseTrainer):
     def evaluate(self):
         self.net.eval()
 
-        feature_list, label_list = [], []
+        feature_list, feature_reco_list, label_list = [], [], []
         reconstruction_loss = 0
         with tqdm(total=self.n_val, desc=f'Validation round', unit='vector', leave=False) as pbar:
             for imgs, labels in self.val_loader:
@@ -246,20 +246,23 @@ class EndToEndTrainer(BaseTrainer):
                 label_list.append(labels.numpy())
             
                 features = self.net.extractor(imgs)
-                featrues_reco = self.net.decoder(self.net.encoder(features).half().float())
-                reconstruction_loss += self.criterion_recons(featrues_reco, features).item() * labels.shape[0]
+                features_reco = self.net.decoder(self.net.encoder(features).half().float())
+                reconstruction_loss += self.criterion_recons(features_reco, features).item() * labels.shape[0]
 
-                featrues_reco = F.normalize(featrues_reco, dim=1).cpu().numpy()
-                feature_list.append(featrues_reco)
+                features = F.normalize(features, dim=1).cpu().numpy()
+                features_reco = F.normalize(features_reco, dim=1).cpu().numpy()
+                feature_list.append(features)
+                feature_reco_list.append(features_reco)
 
                 pbar.update(imgs.shape[0])
 
         features = np.concatenate(feature_list, axis=0)
+        features_reco = np.concatenate(feature_reco_list, axis=0)
         labels = np.concatenate(label_list, axis=0)
-        del feature_list, label_list
-        dists = np.matmul(features, features.T)
+        del feature_list, feature_reco_list, label_list
+        dists = np.matmul(features_reco, features.T)
         ranks = np.argsort(-dists, axis=1)
-        del dists, features
+        del dists, features, features_reco
         # features = torch.cat(feature_list, dim=0)
         # labels = np.concatenate(label_list, axis=0)
         # del feature_list, label_list
