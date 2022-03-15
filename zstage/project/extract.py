@@ -305,29 +305,29 @@ def extract():
     fea_dir = 'feature'
     os.makedirs(fea_dir, exist_ok=True)
 
-    val_dataset = ImageDataset(img_dir)
-    val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=128, num_workers=8)
-    img_count = 0
-    rgb = torch.zeros(3)
-    for imgs, basenames in val_dataloader:
-        img_count += imgs.shape[0]
-        rgb += imgs.sum(dim=(0,2,3))
-    img_count *= 128*256
-    rgb /= img_count
-    mean = rgb
-    rgb = rgb[None, :, None, None]
-    var = torch.zeros(3)
-    for imgs, basenames in val_dataloader:
-        var += torch.pow(imgs - rgb, 2).sum(dim=(0,2,3))
-    var /= img_count
-    std = var.sqrt()
-    mean = mean.tolist()
-    std = std.tolist()
+    # val_dataset = ImageDataset(img_dir)
+    # val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=128, num_workers=8)
+    # img_count = 0
+    # rgb = torch.zeros(3)
+    # for imgs, basenames in val_dataloader:
+    #     img_count += imgs.shape[0]
+    #     rgb += imgs.sum(dim=(0,2,3))
+    # img_count *= 128*256
+    # rgb /= img_count
+    # mean = rgb
+    # rgb = rgb[None, :, None, None]
+    # var = torch.zeros(3)
+    # for imgs, basenames in val_dataloader:
+    #     var += torch.pow(imgs - rgb, 2).sum(dim=(0,2,3))
+    # var /= img_count
+    # std = var.sqrt()
+    # mean = mean.tolist()
+    # std = std.tolist()
 
     transform = T.Compose([
         T.Resize([256, 128]),
         T.ToTensor(),
-        T.Normalize(mean=mean, std=std),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
     dataset = ImageDataset(img_dir, transform=transform)
