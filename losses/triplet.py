@@ -176,3 +176,42 @@ class CenterLoss(nn.Module):
         dist = distmat * mask.float()
         loss = dist.clamp(min=1e-12, max=1e+12).sum() / batch_size
         return loss
+
+
+def softmax_weights(dist, mask):
+    max_v = torch.max(dist * mask, dim=1, keepdim=True)[0]
+    diff = dist - max_v
+    Z = torch.sum(torch.exp(diff) * mask, dim=1, keepdim=True) + 1e-6 # avoid division by zero
+    W = torch.exp(diff) * mask / Z
+    return W
+
+
+class WeightedRegularizedTriplet(object):
+
+    def __init__(self):
+        self.ranking_loss = nn.SoftMarginLoss()
+
+    def __call__(self, global_feat, labels, normalize_feature=False):
+        if normalize_feature:
+            global_feat = F.normalize(global_feat, dim=-1)
+        dist_mat = euclidean_dist(global_feat, global_feat)
+
+        N = dist_mat.size(0)
+        # shape [N, N]
+        is_pos = labels.expand(N, N).eq(labels.expand(N, N).t()).float()
+        is_neg = labels.expand(N, N).ne(labels.expand(N, N).t()).float()
+
+        # `dist_ap` means distance(anchor, positive)
+        # both `dist_ap` and `relative_p_inds` with shape [N, 1]
+        dist_ap = dist_mat * is_pos
+        dist_an = dist_mat * is_neg
+
+        weights_ap = softmax_weights(dist_ap, is_pos)
+        weights_an = softmax_weights(-dist_an, is_neg)
+        furthest_positive = torch.sum(dist_ap * weights_ap, dim=1)
+        closest_negative = torch.sum(dist_an * weights_an, dim=1)
+
+        y = furthest_positive.new().resize_as_(furthest_positive).fill_(1)
+        loss = self.ranking_loss(closest_negative - furthest_positive, y)
+
+        return loss, furthest_positive, closest_negative

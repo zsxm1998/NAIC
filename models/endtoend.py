@@ -5,6 +5,7 @@ from random import random
 
 from .backbones.efficientnet import efficientnet_b4
 from .backbones.resnet import resnet50
+from .backbones.resnet_nl import resnet50_nl
 
 
 class Encoder(nn.Module):
