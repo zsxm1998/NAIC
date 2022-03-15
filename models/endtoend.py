@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from random import random
 
-from .efficientnet import efficientnet_b4
+from .backbones.efficientnet import efficientnet_b4
 
 
 class Encoder(nn.Module):
@@ -53,9 +53,10 @@ class Decoder(nn.Module):
 
 
 class EndtoEndModel(nn.Module):
-    def __init__(self, model_depth, id_num, extractor_out_dim, compress_dim):
+    def __init__(self, model_name, id_num, extractor_out_dim, compress_dim):
         super(EndtoEndModel, self).__init__()
-        self.extractor = efficientnet_b4(num_classes=extractor_out_dim, pretrained='.details/checkpoints/efficientnet_b4.pth')
+        #self.extractor = eval(model_name)(num_classes=extractor_out_dim, pretrained='.details/checkpoints/efficientnet_b4.pth')
+        self.extractor = eval(model_name.format(extractor_out_dim))
         self.encoder = Encoder(compress_dim, extractor_out_dim)
         self.decoder = Decoder(compress_dim, extractor_out_dim)
         self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim, affine=False), nn.Linear(extractor_out_dim, id_num, bias=False))

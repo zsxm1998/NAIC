@@ -77,7 +77,7 @@ class EndToEndTrainer(BaseTrainer):
                                      num_workers=8, 
                                      pin_memory=True)
 
-        self.net = EndtoEndModel(opt.model_depth, id_num=len(self.train_dataset.pids), extractor_out_dim=opt.feature_dim, compress_dim=opt.compress_dim)
+        self.net = EndtoEndModel(opt.model_name, id_num=len(self.train_dataset.pids), extractor_out_dim=opt.feature_dim, compress_dim=opt.compress_dim)
         if opt.load_model:
             self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
             self.logger.info(f'Model loaded from {opt.load_model}')

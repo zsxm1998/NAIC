@@ -4,7 +4,7 @@ import torch
 
 from functools import partial
 from torch import nn, Tensor
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 
 __all__ = ["EfficientNet", "efficientnet_b0", "efficientnet_b1", "efficientnet_b2", "efficientnet_b3",
@@ -349,7 +349,8 @@ def _efficientnet_model(
     arch: str,
     inverted_residual_setting: List[MBConvConfig],
     dropout: float,
-    pretrained: bool,
+    pretrained: Union[bool, str],
+    progress: bool,
     **kwargs: Any
 ) -> EfficientNet:
     model = EfficientNet(inverted_residual_setting, dropout, **kwargs)

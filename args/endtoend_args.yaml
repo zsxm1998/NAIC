@@ -1,5 +1,5 @@
 info: EndToEnd，efficientnet_b4输出128维，32维压缩，eval使用重建去查询原始，图像归一化使用ImageNet均值标准差，更改为pytorch的RandomErasing
-model_depth: b4
+model_name: efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')
 feature_dim: 128
 compress_dim: 32
 device: 0
