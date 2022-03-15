@@ -91,6 +91,13 @@ class EndToEndTrainer(BaseTrainer):
         self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
         #self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
         self.scheduler = CosineAnnealingWithWarmUpLR(self.optimizer, T_total=opt.epochs, eta_min=1e-8, warm_up_lr=opt.lr/100, warm_up_step=opt.warm_up_step)
+        if opt.load_optimizer:
+            self.optimizer.load_state_dict(torch.load(opt.load_optimizer))
+            self.logger.info(f'Optimizer loaded from {opt.load_optimizer}')
+        if opt.load_scheduler:
+            self.scheduler.load_state_dict(torch.load(opt.load_scheduler))
+            self.logger.info(f'Scheduler loaded from {opt.load_scheduler}')
+
 
         self.criterion_triplet = TripletLoss(margin=0.3)
         self.criterion_center = CenterLoss(num_classes=len(self.train_dataset.pids), feat_dim=opt.feature_dim)
@@ -119,7 +126,7 @@ class EndToEndTrainer(BaseTrainer):
         best_val_score = -1 #float('inf')
         best_ACC_reid = -1
         useless_epoch_count = 0
-        for epoch in range(self.epochs):
+        for epoch in range(self.opt.start_epoch, self.epochs):
             try:
                 self.net.train()
                 epoch_t_loss, epoch_cen_loss, epoch_i_loss, epoch_re_loss, epoch_tr_loss = 0, 0, 0, 0, 0
@@ -210,6 +217,8 @@ class EndToEndTrainer(BaseTrainer):
                     torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
                     torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
                     self.logger.info('Last model saved !')
+                torch.save(self.optimizer.state_dict(), self.checkpoint_dir + 'Optimizer_last.pth')
+                torch.save(self.scheduler.state_dict(), self.checkpoint_dir + 'Scheduler_last.pth')
 
                 if val_score > best_val_score:
                     best_val_score = val_score
@@ -233,13 +242,6 @@ class EndToEndTrainer(BaseTrainer):
             except KeyboardInterrupt:
                 self.logger.info('Receive KeyboardInterrupt, stop training...')
                 break
-
-        if not self.save_cp:
-            torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_last.pth')
-            torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
-            torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
-            torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
-            self.logger.info('Last model saved !')
 
     @torch.no_grad() #使用压缩向量计算ACC_reid和重构L2距离
     def evaluate(self):
