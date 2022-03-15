@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from random import random
 
 from .backbones.efficientnet import efficientnet_b4
+from .backbones.resnet import resnet50
 
 
 class Encoder(nn.Module):
