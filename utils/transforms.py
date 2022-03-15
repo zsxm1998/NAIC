@@ -1,5 +1,6 @@
 import math
 import random
+import torch
 
 
 class RandomErasing(object):
@@ -47,3 +48,15 @@ class RandomErasing(object):
                 return img
 
         return img
+
+
+class RandomPermuteChannel():
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img):
+        if torch.rand(1) >= self.p:
+            return img
+        cidx = list(range(img.shape[0]))
+        random.shuffle(cidx)
+        return img[cidx]

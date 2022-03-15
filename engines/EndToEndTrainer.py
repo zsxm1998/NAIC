@@ -14,7 +14,6 @@ from torch import optim
 import torchvision.transforms as T
 
 from .BaseTrainer import BaseTrainer
-from utils.transforms import RandomErasing
 from datasets.triplet_dataset import TripletDataset, RandomIdentitySampler
 from models.endtoend import EndtoEndModel
 from utils.CosineAnnealingWithWarmUpLR import CosineAnnealingWithWarmUpLR
@@ -42,17 +41,20 @@ class EndToEndTrainer(BaseTrainer):
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.logger.info(f'Using device {self.device}')
 
-        self.img_mean, self.img_std = (0.5114, 0.4065, 0.4534), (0.1380, 0.0849, 0.0814)
+        #self.img_mean, self.img_std = (0.5114, 0.4065, 0.4534), (0.1380, 0.0849, 0.0814)
+        self.img_mean, self.img_std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
 
         self.train_transform = T.Compose([
+            T.Resize([256, 128]),
             T.RandomHorizontalFlip(p=0.5),
             T.Pad(10),
             T.RandomCrop([256, 128]),
             T.ToTensor(),
             T.Normalize(mean=self.img_mean, std=self.img_std),
-            RandomErasing(probability=0.5, mean=self.img_mean),
+            T.RandomErasing(p=0.5, value=self.img_mean), #RandomErasing(probability=0.5, mean=self.img_mean),
         ])
         self.val_transform = T.Compose([
+            T.Resize([256, 128]),
             T.ToTensor(),
             T.Normalize(mean=self.img_mean, std=self.img_std),
         ])
@@ -115,7 +117,7 @@ class EndToEndTrainer(BaseTrainer):
         for epoch in range(self.epochs):
             try:
                 self.net.train()
-                epoch_t_loss, epoch_cen_loss, epoch_i_loss, epoch_re_loss, epoch_con_loss = 0, 0, 0, 0, 0
+                epoch_t_loss, epoch_cen_loss, epoch_i_loss, epoch_re_loss, epoch_tr_loss = 0, 0, 0, 0, 0
                 epoch_count = 0
                 with tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img') as pbar:
                     for imgs, labels in self.train_loader:
@@ -128,28 +130,28 @@ class EndToEndTrainer(BaseTrainer):
                         cen_loss = self.criterion_center(ft, labels)
                         i_loss = self.criterion_identity(fi, labels)
                         re_loss = self.criterion_recons(fr, ft)
-                        con_loss = self.criterion_triplet(fr, labels)[0] #self.criterion_contras(fr, labels, ft, labels)
+                        tr_loss = self.criterion_triplet(fr, labels)[0] #self.criterion_contras(fr, labels, ft, labels)
 
-                        loss = t_loss + 0.0005*cen_loss + i_loss + re_loss + con_loss
+                        loss = t_loss + 0.0005*cen_loss + i_loss + re_loss + tr_loss
                         
                         self.writer.add_scalar('Train_Loss/triplet_loss', t_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/center_loss', cen_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/identity_loss', i_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/reconstruction_loss', re_loss.item(), global_step)
-                        self.writer.add_scalar('Train_Loss/contrastive_loss', con_loss.item(), global_step)
+                        self.writer.add_scalar('Train_Loss/recons_triplet_loss', tr_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/Step_Loss', loss.item(), global_step)
                         epoch_t_loss += t_loss.item() * labels.size(0)
                         epoch_cen_loss += cen_loss.item() * labels.size(0)
                         epoch_i_loss += i_loss.item() * labels.size(0)
                         epoch_re_loss += re_loss * labels.size(0)
-                        epoch_con_loss += con_loss * labels.size(0)
+                        epoch_tr_loss += tr_loss * labels.size(0)
                         epoch_count += labels.size(0)
                         pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
                                          'triplet': t_loss.item(), 
                                          'center': cen_loss.item(), 
                                          'identity': i_loss.item(),
                                          'reconstraction': re_loss.item(),
-                                         'contrastive': con_loss.item(),
+                                         'recons_triplet': tr_loss.item(),
                                         }))
 
                         self.optimizer.zero_grad()
@@ -163,14 +165,14 @@ class EndToEndTrainer(BaseTrainer):
                 epoch_cen_loss /= epoch_count
                 epoch_i_loss /= epoch_count
                 epoch_re_loss /= epoch_count
-                epoch_con_loss /= epoch_count
-                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss + epoch_re_loss + epoch_con_loss
+                epoch_tr_loss /= epoch_count
+                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss + epoch_re_loss + epoch_tr_loss
                 self.logger.info(f'Train epoch {epoch+1} loss: {epoch_loss}, '
                                  f'triplet loss: {epoch_t_loss}, '
                                  f'center loss: {epoch_cen_loss}, '
                                  f'identity loss: {epoch_i_loss}, '
                                  f'reconstruction loss: {epoch_re_loss}, '
-                                 f'contrastive loss: {epoch_con_loss}'
+                                 f'recons_triplet loss: {epoch_tr_loss}'
                                 )
                 self.writer.add_scalar('Train_Loss/Epoch_Loss', epoch_loss, epoch+1)
 
