@@ -82,6 +82,11 @@ class EndToEndTrainer(BaseTrainer):
             self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
             self.logger.info(f'Model loaded from {opt.load_model}')
         self.net.to(device=self.device)
+        if torch.cuda.device_count() > 1 and self.device.type != 'cpu':
+            self.net = nn.DataParallel(self.net)
+            self.logger.info(f'torch.cuda.device_count:{torch.cuda.device_count()}, Use nn.DataParallel')
+        self.net_module = self.net.module if isinstance(self.net, nn.DataParallel) else self.net
+        
 
         self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
         #self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
@@ -194,24 +199,24 @@ class EndToEndTrainer(BaseTrainer):
                 self.scheduler.step()
 
                 if self.save_cp:
-                    torch.save(self.net.state_dict(), self.checkpoint_dir + f'Net_epoch{epoch + 1}.pth')
-                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_epoch{epoch + 1}.pth')
-                    torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_epoch{epoch + 1}.pth')
-                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_epoch{epoch + 1}.pth')
+                    torch.save(self.net_module.state_dict(), self.checkpoint_dir + f'Net_epoch{epoch + 1}.pth')
+                    torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_epoch{epoch + 1}.pth')
+                    torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_epoch{epoch + 1}.pth')
+                    torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_epoch{epoch + 1}.pth')
                     self.logger.info(f'Checkpoint {epoch + 1} saved !')
                 else:
-                    torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_last.pth')
-                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
-                    torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
-                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
+                    torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_last.pth')
+                    torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
+                    torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
+                    torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
                     self.logger.info('Last model saved !')
 
                 if val_score > best_val_score:
                     best_val_score = val_score
-                    torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_best.pth')
-                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_best.pth')
-                    torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_best.pth')
-                    torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_best.pth')
+                    torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_best.pth')
+                    torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_best.pth')
+                    torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_best.pth')
+                    torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
                 else:
@@ -219,7 +224,7 @@ class EndToEndTrainer(BaseTrainer):
 
                 if ACC_reid > best_ACC_reid:
                     best_ACC_reid = ACC_reid
-                    torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_ACC_reid_best.pth')
+                    torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_ACC_reid_best.pth')
 
                 if self.early_stopping and useless_epoch_count == self.early_stopping:
                     self.logger.info(f'There are {useless_epoch_count} useless epochs! Early Stop Training!')
@@ -230,10 +235,10 @@ class EndToEndTrainer(BaseTrainer):
                 break
 
         if not self.save_cp:
-            torch.save(self.net.state_dict(), self.checkpoint_dir + 'Net_last.pth')
-            torch.save(self.net.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
-            torch.save(self.net.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
-            torch.save(self.net.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
+            torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_last.pth')
+            torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
+            torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
+            torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
             self.logger.info('Last model saved !')
 
     @torch.no_grad() #使用压缩向量计算ACC_reid和重构L2距离
@@ -247,8 +252,9 @@ class EndToEndTrainer(BaseTrainer):
                 imgs = imgs.to(self.device)
                 label_list.append(labels.numpy())
             
-                features = self.net.extractor(imgs)
-                features_reco = self.net.decoder(self.net.encoder(features).half().float())
+                # features = self.net.extractor(imgs)
+                # features_reco = self.net.decoder(self.net.encoder(features).half().float())
+                features, _, features_reco = self.net(imgs)
                 reconstruction_loss += self.criterion_recons(features_reco, features).item() * labels.shape[0]
 
                 features = F.normalize(features, dim=1).cpu().numpy()
