@@ -84,23 +84,46 @@ def reconstruct(bytes_rate, root=''):
     decoder.eval()
 
     featuredataset = FeatureDataset(compressed_query_fea_dir, bytes_rate=bytes_rate)
-    featureloader = DataLoader(featuredataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+    featureloader = DataLoader(featuredataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+
+    code_dict = np.fromfile(os.path.join(root, f'project/compress.dict'), dtype='<f4')
+    code_dict = code_dict.reshape(-1, 128)
 
     for vector, basename in featureloader:
-        if bytes_rate != 256:
-            vector = vector.to(device)
-            reconstructed = decoder(vector).cpu()
-        else:
-            reconstructed = vector
-        
-        expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
-        expand_r[:, :128] = reconstructed
-        expand_r = expand_r.numpy().astype('<f4')
+        compressed_fea_path = os.path.join(compressed_query_fea_dir, basename[0] + '.dat')
+        with open(compressed_fea_path, 'rb') as f:
+            filedata = f.read()
+            filesize = f.tell()
+        is_normal = True
+        if filesize == 32:
+            is_normal = False
+        if is_normal:
+            if bytes_rate != 256:
+                vector = vector.to(device)
+                reconstructed = decoder(vector).cpu()
+            else:
+                reconstructed = vector
+            
+            expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
+            expand_r[:, :128] = reconstructed
+            expand_r = expand_r.numpy().astype('<f4')
 
-        for i, bname in enumerate(basename):
-            reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
-            # with open(reconstructed_fea_path, 'wb') as bf:
-            #     bf.write(expand_r[i].numpy().tobytes())
-            expand_r[i].tofile(reconstructed_fea_path)
+            for i, bname in enumerate(basename):
+                reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
+                # with open(reconstructed_fea_path, 'wb') as bf:
+                #     bf.write(expand_r[i].numpy().tobytes())
+                expand_r[i].tofile(reconstructed_fea_path)
+        else:
+            for i, bname in enumerate(basename):
+                reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
+                ori = []
+                for i in range(16):
+                    idx = 0
+                    for j in range(2):
+                        idx = idx + filedata[i * 2 + j] * (256 ** j)
+                    ori += code_dict[idx].tolist()
+                fea = np.array(ori)
+                with open(reconstructed_fea_path, 'wb') as f:
+                    f.write(fea.astype('<f4').tostring())
 
     print('Reconstruction Done')
