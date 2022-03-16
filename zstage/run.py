@@ -10,6 +10,7 @@ import numpy as np
 import torch.nn.functional as F
 import json
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 root = '/nfs3-p1/zsxm/naic/rematch/test'
 
 # extract(root=root)
