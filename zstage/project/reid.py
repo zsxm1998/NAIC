@@ -11,7 +11,7 @@ def read_feature_file(path: str) -> np.ndarray:
 
 def reid(bytes_rate, root=''):
     reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
-    gallery_fea_dir = os.path.join(root, 'gallery_feature')
+    gallery_fea_dir = 'gallery_feature' if root == '' else os.path.join(root, 'query_feature')
     reid_results_path = os.path.join(root, 'reid_results/{}.json'.format(bytes_rate))
     os.makedirs(os.path.dirname(reid_results_path), exist_ok=True)
 
