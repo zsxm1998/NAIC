@@ -79,7 +79,7 @@ def reconstruct(bytes_rate, root=''):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     decoder = Decoder(32, 128)
-    decoder.load_state_dict(torch.load(f'project/Decoder_32_best.pth'))
+    decoder.load_state_dict(torch.load(os.path.join(root, f'project/Decoder_32_best.pth')))
     decoder.to(device)
     decoder.eval()
 

@@ -46,7 +46,7 @@ def compress(bytes_rate, root=''):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     encoder = Encoder(32, 128)
-    encoder.load_state_dict(torch.load(f'project/Encoder_32_best.pth'))
+    encoder.load_state_dict(torch.load(os.path.join(root, f'project/Encoder_32_best.pth')))
     encoder.to(device)
     encoder.eval()
 

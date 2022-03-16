@@ -71,7 +71,7 @@ def extract(root=''):
     dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=128, num_workers=8)
     extractor = efficientnet_b4(num_classes=128)
-    extractor.load_state_dict(torch.load('project/Extractor_128_best.pth'))
+    extractor.load_state_dict(torch.load(os.path.join(root, 'project/Extractor_128_best.pth')))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     extractor.to(device)
     extractor.eval()
