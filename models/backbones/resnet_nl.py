@@ -176,8 +176,8 @@ class ResNetNL(nn.Module):
         non_layers=[0, 2, 3, 0],
         last_stride=2,
         gem_pool=True,
-        have_fc = True,
-        num_classes = 1000,
+        have_fc=True,
+        num_classes=1000,
     ):
         self.inplanes = 64
         super().__init__()

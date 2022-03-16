@@ -61,7 +61,9 @@ class EndtoEndModel(nn.Module):
         self.extractor = eval(model_name.format(extractor_out_dim))
         self.encoder = Encoder(compress_dim, extractor_out_dim)
         self.decoder = Decoder(compress_dim, extractor_out_dim)
-        self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim, affine=False), nn.Linear(extractor_out_dim, id_num, bias=False))
+        #self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim, affine=False), nn.Linear(extractor_out_dim, id_num, bias=False))
+        self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim), nn.Linear(extractor_out_dim, id_num, bias=False))
+        self.BNNeck[0].bias.requires_grad_(False)
 
     def forward(self, imgs):
         ft = self.extractor(imgs)

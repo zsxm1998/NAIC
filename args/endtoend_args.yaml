@@ -1,14 +1,17 @@
-info: EndToEnd，efficientnet_b4输出128维，32维压缩，eval使用重建去查询原始，图像归一化使用ImageNet均值标准差，更改为pytorch的RandomErasing
-model_name: efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')
+info: EndToEnd，resnet50_nl输出128维，32维压缩，eval使用重建去查询原始，BNNeck里BN的bias的requires_grad为False，增加自然数据
+model_name: resnet50_nl(num_classes={}, pretrained='.details/checkpoints/resnet50.pth', last_stride=1)
 feature_dim: 128
 compress_dim: 32
-device: 0
+device: 3
 epochs: 120
 early_stopping: 0
 batch_size: 128
 lr: 0.00035
 weight_decay: 0.0005
 warm_up_step: 10
-source: /nfs3-p1/zsxm/naic/rematch/train/
+source: /nfs3-p2/zsxm/naic/rematch/multidataset
 save_cp: false
+start_epoch: 0
 load_model: False
+load_optimizer: False
+load_scheduler: False
