@@ -4,18 +4,34 @@ import gc
 
 import numpy as np
 import torch
+import torch.nn.functional as F
+
+WEIGHT = [0.02, 0.56, 0.24, 0.1, 0.02, 0.01, 0.02, 0.02, 0.02]
 
 def read_feature_file(path: str) -> np.ndarray:
     return np.fromfile(path, dtype='<f4')[:128]
 
+def l2_dist(q, k):
+    return torch.linalg.norm(q.unsqueeze(-2) - k.unsqueeze(0), dim=-1, ord=2)
 
-def reid(bytes_rate, root=''):
+def cosine_similarity(q, k):
+    q = F.normalize(q, dim=-1)
+    k = F.normalize(k, dim=-1)
+    return torch.mm(q, k.T)
+
+def pearson_similarity(q, k):
+    q = q - q.mean(dim=-1, keepdim=True)
+    k = k - k.mean(dim=-1, keepdim=True)
+    return cosine_similarity(q, k)
+
+def reid(bytes_rate, root='', method='rerank_l2'):
     reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
     gallery_fea_dir = 'gallery_feature' if root == '' else os.path.join(root, 'query_feature')
     reid_results_path = os.path.join(root, 'reid_results/{}.json'.format(bytes_rate))
     os.makedirs(os.path.dirname(reid_results_path), exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    torch.cuda.empty_cache()
 
     query_names = sorted(os.listdir(reconstructed_query_fea_dir))
     gallery_names = sorted(os.listdir(gallery_fea_dir))
@@ -40,26 +56,43 @@ def reid(bytes_rate, root=''):
     del reconstructed_query_fea_list, gallery_fea_list
     gc.collect()
 
-    cos = torch.nn.CosineSimilarity(dim=1)
-
-    # dists = np.linalg.norm(reconstructed_query_fea_all - gallery_fea_all, ord=2, axis=2)[:, :top_num]
-    # indexes = np.argsort(dists, axis=1)
-
-    result_dict = {}
+    query_names = [name.rsplit('.', 1)[0] + '.png' for name in query_names]
     gallery_names_array = np.array(list(map(lambda _: _.rsplit('.', 1)[0] + '.png', gallery_names)))
     del gallery_names
-    for query_idx, query_name in enumerate(query_names):
-        query_name = query_name.rsplit('.', 1)[0] + '.png'
-        try:
-            res = cos(reconstructed_query_fea_all[query_idx].unsqueeze(0), gallery_fea_all)
-        except RuntimeError:
-            reconstructed_query_fea_all = reconstructed_query_fea_all.cpu()
-            gallery_fea_all = gallery_fea_all.cpu()
-            res = cos(reconstructed_query_fea_all[query_idx].unsqueeze(0), gallery_fea_all)
-        indexes = torch.argsort(res, descending=True)[:top_num].cpu().numpy()
 
-        result_dict[query_name] = gallery_names_array[indexes].tolist()
+    dist_func = {'cosine': cosine_similarity,
+                 'pearson': pearson_similarity,
+                 'l2': l2_dist,
+                 'rerank_cosine': cosine_similarity,
+                 'rerank_pearson': pearson_similarity,
+                 'rerank_l2': l2_dist,
+                }
+    batch_size = 50 if 'l2' in method else 512
+    result_dict = {}
+    for i in range(0, len(query_names), batch_size):
+        j = min(i+batch_size, len(query_names))
+        query_idx = torch.arange(i, j)
+        dist = dist_func[method](reconstructed_query_fea_all[query_idx], gallery_fea_all)
+        indexes = torch.argsort(dist, dim=-1, descending = 'l2' not in method)[:, :top_num].cpu()
+        del dist
+        torch.cuda.empty_cache()
+
+        if 'rerank' not in method:
+            indexes = indexes.numpy()
+        else:
+            probe = reconstructed_query_fea_all[query_idx] * WEIGHT[0]
+            for w in range(len(WEIGHT) - 1):
+                probe += WEIGHT[w+1] * gallery_fea_all[indexes[:, w]]
+            dist = dist_func[method](probe, gallery_fea_all)
+            indexes = torch.argsort(dist, dim=-1, descending = 'l2' not in method)[:, :top_num].cpu().numpy()
+            del dist
+        
+        for s, k in enumerate(range(i, j)):
+            result_dict[query_names[k]] = gallery_names_array[indexes[s]].tolist()
+
+        del indexes
         gc.collect()
+        torch.cuda.empty_cache()
 
     with open(reid_results_path, 'w', encoding='UTF8') as f:
         f.write(json.dumps(result_dict, indent=2, sort_keys=False))
