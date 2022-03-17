@@ -49,7 +49,7 @@ class BaseTrainer(ABC):
         self.writer.close()
         self.logger.info('Close self.writer')
         if not os.listdir(self.checkpoint_dir):
-            os.remove(self.checkpoint_dir)
+            os.rmdir(self.checkpoint_dir)
             self.logger.info('Remove self.checkpoint_dir')
         gc.collect()
 
