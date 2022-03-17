@@ -24,10 +24,11 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, intermediate_dim, output_dim):
+    def __init__(self, intermediate_dim, output_dim, last_relu=False):
         super(Decoder, self).__init__()
         self.intermediate_dim = intermediate_dim
         self.output_dim = output_dim
+        self.last_relu = last_relu
 
         self.relu = nn.LeakyReLU(inplace=True)
         self.dl1 = nn.Linear(intermediate_dim, 256)
@@ -51,7 +52,10 @@ class Decoder(nn.Module):
         x = self.dp3(self.relu(self.dn3(self.dl3(x))))
         x = self.dp4(self.relu(self.dn4(self.dl4(x))))
         x = self.dp5(self.relu(self.dn5(self.dl5(x))))
-        return self.dl6(x)
+        x = self.dl6(x)
+        if self.last_relu:
+            x = self.relu(x)
+        return x
 
 
 class EndtoEndModel(nn.Module):
@@ -60,9 +64,9 @@ class EndtoEndModel(nn.Module):
         #self.extractor = eval(model_name)(num_classes=extractor_out_dim, pretrained='.details/checkpoints/efficientnet_b4.pth')
         self.extractor = eval(model_name.format(extractor_out_dim))
         self.encoder = Encoder(compress_dim, extractor_out_dim)
-        self.decoder = Decoder(compress_dim, extractor_out_dim)
+        self.decoder = Decoder(compress_dim, extractor_out_dim, last_relu='have_fc=False' in model_name)
         self.encoder2 = Encoder(compress_dim*2, extractor_out_dim)
-        self.decoder2 = Decoder(compress_dim*2, extractor_out_dim)
+        self.decoder2 = Decoder(compress_dim*2, extractor_out_dim, last_relu='have_fc=False' in model_name)
         #self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim, affine=False), nn.Linear(extractor_out_dim, id_num, bias=False))
         self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim), nn.Linear(extractor_out_dim, id_num, bias=False))
         self.BNNeck[0].bias.requires_grad_(False)

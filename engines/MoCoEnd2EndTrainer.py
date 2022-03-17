@@ -13,13 +13,13 @@ from torch import optim
 
 from .BaseTrainer import BaseTrainer
 from datasets.rematch_dataset import RematchDataset, RematchBatchSampler, rematch_collate_fn, RematchEvalDataset
-from models.end2end import MoCo
+from models.mocoend2end import MoCo
 from losses.supcon import SupConLoss
 from losses.reconstruction import L2ReconstructionLoss, ExpReconstructionLoss, EnlargeReconstructionLoss
 from utils.CosineAnnealingWithWarmUpLR import CosineAnnealingWithWarmUpLR
 
 class End2EndTrainer(BaseTrainer):
-    def __init__(self, opt_file='args/end2end_args.yaml'):
+    def __init__(self, opt_file='args/moco_end2end_args.yaml'):
         super(End2EndTrainer, self).__init__(checkpoint_root='End2End')
 
         with open(opt_file) as f:

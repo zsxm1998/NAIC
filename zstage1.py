@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from models.end2end import resnet_encoder, Encoder
+from models.mocoend2end import resnet_encoder, Encoder
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import glob

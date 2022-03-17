@@ -1,15 +1,15 @@
-info: EndToEnd，efficientnet_b5输出128维，32维和64维压缩分两个AE，分别对两个AE的结果做triplet和L2，eval使用32维的重建去查询原始，增加自然数据集，优化器换Ranger
-model_name: efficientnet_b5(num_classes={}, pretrained='.details/checkpoints/efficientnet_b5.pth')
-feature_dim: 128
+info: EndToEnd，resnet50_nl输出2048维，32维和64维压缩分两个AE，分别对两个AE的结果做triplet和L2，eval使用32维的重建去查询原始，优化器换Ranger，增加迁移数据集，Decoder最后LeakyReLU
+model_name: resnet50_nl(num_classes={}, pretrained='.details/checkpoints/resnet50.pth', last_stride=1, have_fc=False)
+feature_dim: 2048
 compress_dim: 32
-device: 0
+device: 2
 epochs: 120
 early_stopping: 0
 batch_size: 64
 lr: 0.00035
 weight_decay: 0.0005
 warm_up_step: 10
-source: /disk1/zsxm/datasets/naic/multidataset
+source: /nfs3-p1/zsxm/naic/rematch/multidataset_trans
 save_cp: false
 start_epoch: 0
 load_model: False
