@@ -9,6 +9,7 @@ from torch import nn
 import numpy as np
 import torch.nn.functional as F
 import json
+import time
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 root = '/nfs3-p1/zsxm/naic/rematch/test'
@@ -16,13 +17,14 @@ root = '/nfs3-p1/zsxm/naic/rematch/test'
 # extract(root=root)
 # os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
-# for byte_rate in ['64', '128', '256']:
-#     compress(byte_rate, root=root)
+t1 = time.time()
+for byte_rate in ['64', '128', '256']:
+    compress(byte_rate, root=root)
 
-# for byte_rate in ['64', '128', '256']:
-    # reconstruct(byte_rate, root=root)
-compress(256, root=root)
-reconstruct(256, root=root)
+for byte_rate in ['64', '128', '256']:
+    reconstruct(byte_rate, root=root)
+print(time.time()-t1)
+
 
 class L2ReconstructionLoss(nn.Module):
     def __init__(self):
@@ -45,13 +47,16 @@ for byte_rate in ['64', '128', '256']:
     reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
     del reconstruct_feature_list
     print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
-# # byte_rate 64 L2 loss: 0.13101239502429962
-# # byte_rate 128 L2 loss: 0.13101236522197723
-# # byte_rate 256 L2 loss: 0.00017850534641183913
-# # huffman误差
-# # byte_rate 64 L2 loss: tensor(0.6154)
-# # byte_rate 128 L2 loss: tensor(0.4219)
-# # byte_rate 256 L2 loss: tensor(5.8545e-05)
+# AE 时间 256.0719175338745
+# byte_rate 64 L2 loss: 0.13094088435173035
+# byte_rate 128 L2 loss: 0.13094089925289154
+# byte_rate 256 L2 loss: 0.00017850534641183913
+# huffman 时间 522.4919316768646
+# byte_rate 64 L2 loss: 0.5273605585098267
+# byte_rate 128 L2 loss: 0.08254222571849823
+# byte_rate 256 L2 loss: 0.00017850534641183913
+# AE+原始字典压缩 时间
+
 
 # def calc_acc_reid(query, gallary, labels):
 #     device = torch.device('cuda:0')
