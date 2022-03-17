@@ -53,7 +53,7 @@ def compress(bytes_rate, root=''):
     encoder.eval()
 
     featuredataset = FeatureDataset(query_fea_dir)
-    featureloader = DataLoader(featuredataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+    featureloader = DataLoader(featuredataset, batch_size=512, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     # load code dictionary
     code_dict = np.fromfile(os.path.join(root, f'project/compress.dict'), dtype='<f4')
@@ -70,110 +70,126 @@ def compress(bytes_rate, root=''):
     rev128 = state['rev128']
     nums128 = state['nums128']
 
+    normal_list, normal_basenames = [], []
+    abnormal_list, abnormal_basenames = [], []
     for vector, basename in featureloader:
-        # is_normal 
-        is_normal = True
-        for i in range(128, 2048):
-            if float(vector[0][i]) != 0.00000 :
-                is_normal = False
-                break
-        if is_normal:
-            # 正常情况
-            if bytes_rate != 256:
-                vector = vector[:, :128]
-                if bytes_rate == 64:
-                    bname = basename[0]
-                    compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                    output_len = 0
-                    code = ''
-                    with open(compressed_fea_path, 'wb') as f:
-                        for extract_num in vector[0]:
-                            extract_num = float(extract_num)
-                            distance = 10000000 # inf
-                            closest_num = -1
-                            for num in nums64:
-                                if abs(num - extract_num) < distance:
-                                    closest_num = num
-                                    distance = abs(num - extract_num)
-                            code = code + for64[closest_num]
-                        out = 0
-                        while len(code) > 8 and output_len < 64:
-                            for x in range(8):
-                                out = out << 1
-                                if code[x] == '1':
-                                    out = out | 1
-                            code = code[8:]
-                            f.write(six.int2byte(out))
-                            output_len += 1
-                            out = 0
-                        # 处理剩下来的不满8位的code
-                        out = 0
-                        for i in range(len(code)):
-                            out = out << 1
-                            if code[i]=='1':
-                                out = out | 1
-                        for i in range(8 - len(code)):
-                            out = out << 1
-                        # 把最后一位给写入到文件当中
-                        if output_len < 64:
-                            f.write(six.int2byte(out))
-                elif bytes_rate == 128:
-                    bname = basename[0]
-                    compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                    output_len = 0
-                    code = ''
-                    with open(compressed_fea_path, 'wb') as f:
-                        for extract_num in vector[0]:
-                            extract_num = float(extract_num)
-                            distance = 10000000 # inf
-                            closest_num = -1
-                            for num in nums128:
-                                if abs(num - extract_num) < distance:
-                                    closest_num = num
-                                    distance = abs(num - extract_num)
-                            code = code + for128[closest_num]
-                        out = 0
-                        while len(code) > 8 and output_len < 128:
-                            for x in range(8):
-                                out = out << 1
-                                if code[x] == '1':
-                                    out = out | 1
-                            code = code[8:]
-                            f.write(six.int2byte(out))
-                            output_len += 1
-                            out = 0
-                        # 处理剩下来的不满8位的code
-                        out = 0
-                        for i in range(len(code)):
-                            out = out << 1
-                            if code[i]=='1':
-                                out = out | 1
-                        for i in range(8 - len(code)):
-                            out = out << 1
-                        # 把最后一位给写入到文件当中
-                        if output_len < 128:
-                            f.write(six.int2byte(out))
-            else:
-                compressed = vector[:, :128].half().numpy().astype('<f2')
-                for i, bname in enumerate(basename):
-                    compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                    # with open(compressed_fea_path, 'wb') as bf:
-                    #     bf.write(compressed[i].numpy().tobytes())
-                    compressed[i].tofile(compressed_fea_path)
-        else:
-            # 其他情况
-            vector = vector.numpy().tolist()[0]
-            for i, bname in enumerate(basename):
-                compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                with open(compressed_fea_path, 'wb') as f:
-                    # 16 * 16 = 256
-                    for i in range(0, 16):
-                        ra = np.array(vector[i * 128: (i + 1) * 128]).reshape(1, -1).astype('float32')
-                        k = 1
-                        D, I = index.search(ra, k)
-                        min_idx = int(I[0])
-                        for j in range(2):
-                            f.write(six.int2byte(min_idx % 256))
-                            min_idx = min_idx // 256
+        basename = np.array(basename)
+        normal_res = vector[:, 128:].eq(0).all(dim=-1)
+        normal_list.append(vector[normal_res==True])
+        normal_basenames.append(basename[normal_res==True])
+        abnormal_list.append(vector[normal_res==False])
+        abnormal_basenames.append(basename[normal_res==False])
 
-    print('Compression Done')
+    normal_list = torch.cat(normal_list, dim=0)
+    normal_basenames = np.concatenate(normal_basenames, axis=0)
+    abnormal_list = torch.cat(abnormal_list, dim=0)
+    abnormal_basenames = np.concatenate(abnormal_basenames, axis=0)
+    
+
+    # for vector, basename in featureloader:
+    #     # is_normal 
+    #     is_normal = True
+    #     for i in range(128, 2048):
+    #         if float(vector[0][i]) != 0.00000 :
+    #             is_normal = False
+    #             break
+    #     if is_normal:
+    #         # 正常情况
+    #         if bytes_rate != 256:
+    #             vector = vector[:, :128]
+    #             if bytes_rate == 64:
+    #                 bname = basename[0]
+    #                 compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+    #                 output_len = 0
+    #                 code = ''
+    #                 with open(compressed_fea_path, 'wb') as f:
+    #                     for extract_num in vector[0]:
+    #                         extract_num = float(extract_num)
+    #                         distance = 10000000 # inf
+    #                         closest_num = -1
+    #                         for num in nums64:
+    #                             if abs(num - extract_num) < distance:
+    #                                 closest_num = num
+    #                                 distance = abs(num - extract_num)
+    #                         code = code + for64[closest_num]
+    #                     out = 0
+    #                     while len(code) > 8 and output_len < 64:
+    #                         for x in range(8):
+    #                             out = out << 1
+    #                             if code[x] == '1':
+    #                                 out = out | 1
+    #                         code = code[8:]
+    #                         f.write(six.int2byte(out))
+    #                         output_len += 1
+    #                         out = 0
+    #                     # 处理剩下来的不满8位的code
+    #                     out = 0
+    #                     for i in range(len(code)):
+    #                         out = out << 1
+    #                         if code[i]=='1':
+    #                             out = out | 1
+    #                     for i in range(8 - len(code)):
+    #                         out = out << 1
+    #                     # 把最后一位给写入到文件当中
+    #                     if output_len < 64:
+    #                         f.write(six.int2byte(out))
+    #             elif bytes_rate == 128:
+    #                 bname = basename[0]
+    #                 compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+    #                 output_len = 0
+    #                 code = ''
+    #                 with open(compressed_fea_path, 'wb') as f:
+    #                     for extract_num in vector[0]:
+    #                         extract_num = float(extract_num)
+    #                         distance = 10000000 # inf
+    #                         closest_num = -1
+    #                         for num in nums128:
+    #                             if abs(num - extract_num) < distance:
+    #                                 closest_num = num
+    #                                 distance = abs(num - extract_num)
+    #                         code = code + for128[closest_num]
+    #                     out = 0
+    #                     while len(code) > 8 and output_len < 128:
+    #                         for x in range(8):
+    #                             out = out << 1
+    #                             if code[x] == '1':
+    #                                 out = out | 1
+    #                         code = code[8:]
+    #                         f.write(six.int2byte(out))
+    #                         output_len += 1
+    #                         out = 0
+    #                     # 处理剩下来的不满8位的code
+    #                     out = 0
+    #                     for i in range(len(code)):
+    #                         out = out << 1
+    #                         if code[i]=='1':
+    #                             out = out | 1
+    #                     for i in range(8 - len(code)):
+    #                         out = out << 1
+    #                     # 把最后一位给写入到文件当中
+    #                     if output_len < 128:
+    #                         f.write(six.int2byte(out))
+    #         else:
+    #             compressed = vector[:, :128].half().numpy().astype('<f2')
+    #             for i, bname in enumerate(basename):
+    #                 compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+    #                 # with open(compressed_fea_path, 'wb') as bf:
+    #                 #     bf.write(compressed[i].numpy().tobytes())
+    #                 compressed[i].tofile(compressed_fea_path)
+    #     else:
+    #         # 其他情况
+    #         vector = vector.numpy().tolist()[0]
+    #         for i, bname in enumerate(basename):
+    #             compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+    #             with open(compressed_fea_path, 'wb') as f:
+    #                 # 16 * 16 = 256
+    #                 for i in range(0, 16):
+    #                     ra = np.array(vector[i * 128: (i + 1) * 128]).reshape(1, -1).astype('float32')
+    #                     k = 1
+    #                     D, I = index.search(ra, k)
+    #                     min_idx = int(I[0])
+    #                     for j in range(2):
+    #                         f.write(six.int2byte(min_idx % 256))
+    #                         min_idx = min_idx // 256
+
+    # print('Compression Done')

@@ -1,7 +1,7 @@
-from project.extract import extract
-from project.compress import compress
-from project.reconstruct import reconstruct
-from project.reid import reid
+from project_huffman.extract import extract
+from project_huffman.compress import compress
+from project_huffman.reconstruct import reconstruct
+from project_huffman.reid import reid
 
 import os
 import torch
@@ -55,7 +55,10 @@ for byte_rate in ['64', '128', '256']:
 # byte_rate 64 L2 loss: 0.5273605585098267
 # byte_rate 128 L2 loss: 0.08254222571849823
 # byte_rate 256 L2 loss: 0.00017850534641183913
-# AE+原始字典压缩 时间
+# AE+原始字典压缩 时间 1731.4566342830658
+# byte_rate 64 L2 loss: 0.131012424826622
+# byte_rate 128 L2 loss: 0.13101236522197723
+# byte_rate 256 L2 loss: 0.00017850534641183913
 
 
 # def calc_acc_reid(query, gallary, labels):

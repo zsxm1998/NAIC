@@ -1,5 +1,4 @@
 import os
-from torchaudio import transforms
 import yaml
 from types import SimpleNamespace
 from collections import OrderedDict
@@ -20,6 +19,7 @@ from utils.CosineAnnealingWithWarmUpLR import CosineAnnealingWithWarmUpLR
 from losses.supcon import SupConLoss
 from losses.reconstruction import L2ReconstructionLoss
 from losses.triplet import TripletLoss, CenterLoss, CrossEntropyLabelSmooth
+from utils.ranger import Ranger
 
 class EndToEndTrainer(BaseTrainer):
     def __init__(self, opt_file='args/endtoend_args.yaml'):
@@ -88,7 +88,7 @@ class EndToEndTrainer(BaseTrainer):
         self.net_module = self.net.module if isinstance(self.net, nn.DataParallel) else self.net
         
 
-        self.optimizer = optim.Adam(self.net.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
+        self.optimizer = Ranger(self.net.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
         #self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=opt.epochs, eta_min=1e-8)
         self.scheduler = CosineAnnealingWithWarmUpLR(self.optimizer, T_total=opt.epochs, eta_min=1e-8, warm_up_lr=opt.lr/100, warm_up_step=opt.warm_up_step)
         if opt.load_optimizer:
@@ -129,41 +129,49 @@ class EndToEndTrainer(BaseTrainer):
         for epoch in range(self.opt.start_epoch, self.epochs):
             try:
                 self.net.train()
-                epoch_t_loss, epoch_cen_loss, epoch_i_loss, epoch_re_loss, epoch_tr_loss = 0, 0, 0, 0, 0
+                epoch_t_loss, epoch_cen_loss, epoch_i_loss, epoch_re_loss, epoch_re2_loss, epoch_tr_loss, epoch_tr2_loss = 0, 0, 0, 0, 0, 0, 0
                 epoch_count = 0
                 with tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img') as pbar:
                     for imgs, labels in self.train_loader:
                         global_step += 1
                         imgs, labels = imgs.to(self.device), labels.to(self.device)
 
-                        ft, fi, fr = self.net(imgs)
+                        ft, fi, fr, fr2 = self.net(imgs)
 
                         t_loss = self.criterion_triplet(ft, labels)[0]
                         cen_loss = self.criterion_center(ft, labels)
                         i_loss = self.criterion_identity(fi, labels)
                         re_loss = self.criterion_recons(fr, ft)
-                        tr_loss = self.criterion_triplet(fr, labels)[0] #self.criterion_contras(fr, labels, ft, labels)
+                        re2_loss = self.criterion_recons(fr2, ft)
+                        tr_loss = self.criterion_triplet(fr, labels)[0]
+                        tr2_loss = self.criterion_triplet(fr2, labels)[0]
 
-                        loss = t_loss + 0.0005*cen_loss + i_loss + re_loss + tr_loss
+                        loss = t_loss + 0.0005*cen_loss + i_loss + re_loss + tr_loss + re2_loss + tr2_loss
                         
                         self.writer.add_scalar('Train_Loss/triplet_loss', t_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/center_loss', cen_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/identity_loss', i_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/reconstruction_loss', re_loss.item(), global_step)
+                        self.writer.add_scalar('Train_Loss/reconstruction2_loss', re2_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/recons_triplet_loss', tr_loss.item(), global_step)
+                        self.writer.add_scalar('Train_Loss/recons_triplet2_loss', tr2_loss.item(), global_step)
                         self.writer.add_scalar('Train_Loss/Step_Loss', loss.item(), global_step)
                         epoch_t_loss += t_loss.item() * labels.size(0)
                         epoch_cen_loss += cen_loss.item() * labels.size(0)
                         epoch_i_loss += i_loss.item() * labels.size(0)
                         epoch_re_loss += re_loss * labels.size(0)
+                        epoch_re2_loss += re2_loss * labels.size(0)
                         epoch_tr_loss += tr_loss * labels.size(0)
+                        epoch_tr2_loss += tr2_loss * labels.size(0)
                         epoch_count += labels.size(0)
                         pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
                                          'triplet': t_loss.item(), 
                                          'center': cen_loss.item(), 
                                          'identity': i_loss.item(),
                                          'reconstraction': re_loss.item(),
+                                         'reconstraction2': re2_loss.item(),
                                          'recons_triplet': tr_loss.item(),
+                                         'recons_triplet2': tr2_loss.item(),
                                         }))
 
                         self.optimizer.zero_grad()
@@ -177,14 +185,18 @@ class EndToEndTrainer(BaseTrainer):
                 epoch_cen_loss /= epoch_count
                 epoch_i_loss /= epoch_count
                 epoch_re_loss /= epoch_count
+                epoch_re2_loss /= epoch_count
                 epoch_tr_loss /= epoch_count
-                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss + epoch_re_loss + epoch_tr_loss
+                epoch_tr2_loss /= epoch_count
+                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss + epoch_re_loss + epoch_tr_loss + epoch_re2_loss + epoch_tr2_loss
                 self.logger.info(f'Train epoch {epoch+1} loss: {epoch_loss}, '
                                  f'triplet loss: {epoch_t_loss}, '
                                  f'center loss: {epoch_cen_loss}, '
                                  f'identity loss: {epoch_i_loss}, '
                                  f'reconstruction loss: {epoch_re_loss}, '
-                                 f'recons_triplet loss: {epoch_tr_loss}'
+                                 f'reconstruction2 loss: {epoch_re2_loss}, '
+                                 f'recons_triplet loss: {epoch_tr_loss}, '
+                                 f'recons_triplet2 loss: {epoch_tr2_loss}, '
                                 )
                 self.writer.add_scalar('Train_Loss/Epoch_Loss', epoch_loss, epoch+1)
 
@@ -196,12 +208,13 @@ class EndToEndTrainer(BaseTrainer):
 
                 self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]['lr'], global_step)
 
-                ACC_reid, reconstruction_loss = self.evaluate()
-                val_score = 0.8 * ACC_reid + 0.2 * np.exp(-reconstruction_loss)
-                self.logger.info(f'Train epoch {epoch+1} val_score: {val_score}, ACC_reid: {ACC_reid}, reconstruction_loss:{reconstruction_loss}')
+                ACC_reid, re_loss, re_loss2 = self.evaluate()
+                val_score = 0.8 * ACC_reid + 0.1 * np.exp(-re_loss) + 0.1 * np.exp(-re_loss2)
+                self.logger.info(f'Train epoch {epoch+1} val_score: {val_score}, ACC_reid: {ACC_reid}, re_loss@{self.opt.compress_dim}:{re_loss}, re_loss@{self.opt.compress_dim*2}:{re_loss2}')
                 self.writer.add_scalar('Val/val_score', val_score, global_step)
                 self.writer.add_scalar('Val/ACC_reid', ACC_reid, global_step)
-                self.writer.add_scalar('Val/reconstruction_loss', reconstruction_loss, global_step)
+                self.writer.add_scalar(f'Val/reconstruction_loss@{self.opt.compress_dim}', re_loss, global_step)
+                self.writer.add_scalar(f'Val/reconstruction_loss@{self.opt.compress_dim*2}', re_loss2, global_step)
 
                 self.scheduler.step()
 
@@ -210,12 +223,16 @@ class EndToEndTrainer(BaseTrainer):
                     torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_epoch{epoch + 1}.pth')
                     torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_epoch{epoch + 1}.pth')
                     torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_epoch{epoch + 1}.pth')
+                    torch.save(self.net_module.encoder2.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim*2}_epoch{epoch + 1}.pth')
+                    torch.save(self.net_module.decoder2.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim*2}_epoch{epoch + 1}.pth')
                     self.logger.info(f'Checkpoint {epoch + 1} saved !')
                 else:
                     torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_last.pth')
                     torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_last.pth')
                     torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_last.pth')
                     torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_last.pth')
+                    torch.save(self.net_module.encoder2.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim*2}_last.pth')
+                    torch.save(self.net_module.decoder2.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim*2}_last.pth')
                     self.logger.info('Last model saved !')
                 torch.save(self.optimizer.state_dict(), self.checkpoint_dir + 'Optimizer_last.pth')
                 torch.save(self.scheduler.state_dict(), self.checkpoint_dir + 'Scheduler_last.pth')
@@ -226,6 +243,8 @@ class EndToEndTrainer(BaseTrainer):
                     torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_best.pth')
                     torch.save(self.net_module.encoder.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim}_best.pth')
                     torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_best.pth')
+                    torch.save(self.net_module.encoder2.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim*2}_best.pth')
+                    torch.save(self.net_module.decoder2.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim*2}_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
                 else:
@@ -248,7 +267,7 @@ class EndToEndTrainer(BaseTrainer):
         self.net.eval()
 
         feature_list, feature_reco_list, label_list = [], [], []
-        reconstruction_loss = 0
+        reconstruction_loss, reconstruction_loss2 = 0, 0
         with tqdm(total=self.n_val, desc=f'Validation round', unit='vector', leave=False) as pbar:
             for imgs, labels in self.val_loader:
                 imgs = imgs.to(self.device)
@@ -256,8 +275,9 @@ class EndToEndTrainer(BaseTrainer):
             
                 # features = self.net.extractor(imgs)
                 # features_reco = self.net.decoder(self.net.encoder(features).half().float())
-                features, _, features_reco = self.net(imgs)
+                features, _, features_reco, features_reco2 = self.net(imgs)
                 reconstruction_loss += self.criterion_recons(features_reco, features).item() * labels.shape[0]
+                reconstruction_loss2 += self.criterion_recons(features_reco2, features).item() * labels.shape[0]
 
                 features = F.normalize(features, dim=1).cpu().numpy()
                 features_reco = F.normalize(features_reco, dim=1).cpu().numpy()
@@ -299,12 +319,13 @@ class EndToEndTrainer(BaseTrainer):
             mAP += ap
         
         reconstruction_loss /= ranks.shape[0]
+        reconstruction_loss2 /= ranks.shape[0]
         acc1 /= ranks.shape[0]
         mAP /= ranks.shape[0]
         ACC_reid = (acc1 + mAP) / 2
 
         self.net.train()
-        return ACC_reid, reconstruction_loss
+        return ACC_reid, reconstruction_loss, reconstruction_loss2
 
     # @torch.no_grad() # 使用未压缩向量计算mAP和reconstruction loss
     # def evaluate(self):

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from random import random
 
-from .backbones.efficientnet import efficientnet_b4
+from .backbones.efficientnet import efficientnet_b4, efficientnet_b5
 from .backbones.resnet import resnet50
 from .backbones.resnet_nl import resnet50_nl
 
@@ -61,6 +61,8 @@ class EndtoEndModel(nn.Module):
         self.extractor = eval(model_name.format(extractor_out_dim))
         self.encoder = Encoder(compress_dim, extractor_out_dim)
         self.decoder = Decoder(compress_dim, extractor_out_dim)
+        self.encoder2 = Encoder(compress_dim*2, extractor_out_dim)
+        self.decoder2 = Decoder(compress_dim*2, extractor_out_dim)
         #self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim, affine=False), nn.Linear(extractor_out_dim, id_num, bias=False))
         self.BNNeck = nn.Sequential(nn.BatchNorm1d(extractor_out_dim), nn.Linear(extractor_out_dim, id_num, bias=False))
         self.BNNeck[0].bias.requires_grad_(False)
@@ -68,5 +70,6 @@ class EndtoEndModel(nn.Module):
     def forward(self, imgs):
         ft = self.extractor(imgs)
         fi = self.BNNeck(ft)
-        fr = self.decoder(self.encoder(ft).half().float()) if random() < 0.5 else self.decoder(self.encoder(ft))
-        return ft, fi, fr
+        fr = self.decoder(self.encoder(ft).half().float())
+        fr2 = self.decoder2(self.encoder2(ft).half().float())
+        return ft, fi, fr, fr2
