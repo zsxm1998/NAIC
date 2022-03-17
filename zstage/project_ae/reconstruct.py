@@ -6,6 +6,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
+DIM_NUM = 128
+BATCH_SIZE = 512
+
 
 def get_file_basename(path: str) -> str:
     return os.path.splitext(os.path.basename(path))[0]
@@ -69,6 +72,62 @@ class Decoder(nn.Module):
         return self.dl6(x)
 
 
+def abnormal_reconstruct(compressed_query_fea_dir, reconstructed_query_fea_dir, basenames, code_dict, bytes_rate):
+    # bytes_rate == 64
+    block_num, each_block_len = 16, 20
+    if bytes_rate == 128:
+        block_num, each_block_len = 32, 20
+    elif bytes_rate == 256:
+        block_num, each_block_len = 64, 22
+
+    for bname in basenames:
+        compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+        reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
+        with open(compressed_fea_path, 'rb') as f:
+            filedata = f.read()
+            filesize = f.tell()
+        code = ''
+        for i in range(filesize):
+            out = filedata[i]
+            for j in range(8):
+                if out & (1<<7):
+                    code = code + '1'
+                else:
+                    code = code + '0'
+                out = out << 1
+                
+        ori = []
+        for i in range(bytes_rate * 8 - block_num * each_block_len, bytes_rate * 8, each_block_len):
+            idx = 0
+            for j in range(0, each_block_len):
+                if code[i + j] == '1':
+                    idx = idx + 2 ** j
+            ori += code_dict[idx].tolist()
+        fea = np.array(ori)
+        with open(reconstructed_fea_path, 'wb') as f:
+            f.write(fea.astype('<f4').tostring())
+
+
+def normal_reconstruct(reconstructed_query_fea_dir, decoder, device, normal_cases, normal_basenames, bytes_rate):
+    for i in range(0, len(normal_cases), BATCH_SIZE):
+        j = min(i+BATCH_SIZE, len(normal_cases))
+        vector = normal_cases[i: j]
+        basename = normal_basenames[i: j]
+        if bytes_rate != 256:
+            vector = vector.to(device)
+            reconstructed = decoder(vector).cpu()
+        else:
+            reconstructed = vector
+        
+        expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
+        expand_r[:, :DIM_NUM] = reconstructed
+        expand_r = expand_r.numpy().astype('<f4')
+
+        for b, bname in enumerate(basename):
+            reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
+            expand_r[b].tofile(reconstructed_fea_path)
+
+
 @torch.no_grad()
 def reconstruct(bytes_rate, root=''):
     if not isinstance(bytes_rate, int):
@@ -78,52 +137,37 @@ def reconstruct(bytes_rate, root=''):
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    decoder = Decoder(32, 128)
+    decoder = Decoder(32, DIM_NUM)
     decoder.load_state_dict(torch.load(os.path.join(root, f'project/Decoder_32_best.pth')))
     decoder.to(device)
     decoder.eval()
 
     featuredataset = FeatureDataset(compressed_query_fea_dir, bytes_rate=bytes_rate)
-    featureloader = DataLoader(featuredataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
-    code_dict = np.fromfile(os.path.join(root, f'project/compress.dict'), dtype='<f4')
-    code_dict = code_dict.reshape(-1, 128)
+    # load code dictionary
+    code_dict = np.fromfile(os.path.join(root, f'project/compress_65536x2048.dict'), dtype='<f4')
+    shape_d = {64: 128, 128: 64, 256: 32}[bytes_rate]
+    code_dict = code_dict.reshape(-1, shape_d)
 
+    normal_list, normal_basenames_list = [], []
+    abnormal_list, abnormal_basenames_list = [], []
     for vector, basename in featureloader:
-        compressed_fea_path = os.path.join(compressed_query_fea_dir, basename[0] + '.dat')
-        with open(compressed_fea_path, 'rb') as f:
-            filedata = f.read()
-            filesize = f.tell()
-        is_normal = True
-        if filesize == 32:
-            is_normal = False
-        if is_normal:
-            if bytes_rate != 256:
-                vector = vector.to(device)
-                reconstructed = decoder(vector).cpu()
-            else:
-                reconstructed = vector
-            
-            expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
-            expand_r[:, :128] = reconstructed
-            expand_r = expand_r.numpy().astype('<f4')
+        basename = np.array(basename)
+        normal_res = torch.isnan(vector[:, :2]).eq(True).all(dim=-1)
+        normal_list.append(vector[normal_res==False])
+        normal_basenames_list.append(basename[normal_res==False])
+        abnormal_list.append(vector[normal_res==True])
+        abnormal_basenames_list.append(basename[normal_res==True])
 
-            for i, bname in enumerate(basename):
-                reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
-                # with open(reconstructed_fea_path, 'wb') as bf:
-                #     bf.write(expand_r[i].numpy().tobytes())
-                expand_r[i].tofile(reconstructed_fea_path)
-        else:
-            for i, bname in enumerate(basename):
-                reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
-                ori = []
-                for i in range(16):
-                    idx = 0
-                    for j in range(2):
-                        idx = idx + filedata[i * 2 + j] * (256 ** j)
-                    ori += code_dict[idx].tolist()
-                fea = np.array(ori)
-                with open(reconstructed_fea_path, 'wb') as f:
-                    f.write(fea.astype('<f4').tostring())
+    normal_cases = torch.cat(normal_list, dim=0)
+    normal_basenames = np.concatenate(normal_basenames_list, axis=0)
+    abnormal_basenames = np.concatenate(abnormal_basenames_list, axis=0)
+    del normal_list, normal_basenames_list, abnormal_list, abnormal_basenames_list
+
+    # normal cases
+    normal_reconstruct(reconstructed_query_fea_dir, decoder, device, normal_cases, normal_basenames, bytes_rate)
+    # abnormal cases
+    abnormal_reconstruct(compressed_query_fea_dir, reconstructed_query_fea_dir, abnormal_basenames, code_dict, bytes_rate)
 
     print('Reconstruction Done')

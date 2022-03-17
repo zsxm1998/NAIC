@@ -6,11 +6,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+DIM_NUM = 128
 WEIGHT = [0.02, 0.56, 0.24, 0.1, 0.02, 0.01, 0.02, 0.02, 0.02]
 # WEIGHT = [0.3, 0.6, 0.1]
 
 def read_feature_file(path: str) -> np.ndarray:
-    return np.fromfile(path, dtype='<f4')[:128]
+    return np.fromfile(path, dtype='<f4')[:DIM_NUM]
 
 def l2_dist(q, k):
     return torch.linalg.norm(q.unsqueeze(-2) - k.unsqueeze(0), dim=-1, ord=2)

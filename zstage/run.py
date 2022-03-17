@@ -1,7 +1,7 @@
-from project_huffman.extract import extract
-from project_huffman.compress import compress
-from project_huffman.reconstruct import reconstruct
-from project_huffman.reid import reid
+from project_ae.extract import extract
+from project_ae.compress import compress
+from project_ae.reconstruct import reconstruct
+from project_ae.reid import reid
 
 import os
 import torch
@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import json
 import time
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 root = '/nfs3-p1/zsxm/naic/rematch/test'
 
 # extract(root=root)
@@ -59,6 +59,10 @@ for byte_rate in ['64', '128', '256']:
 # byte_rate 64 L2 loss: 0.131012424826622
 # byte_rate 128 L2 loss: 0.13101236522197723
 # byte_rate 256 L2 loss: 0.00017850534641183913
+# AE+改进字典压缩 时间 465.51395773887634
+# byte_rate 64 L2 loss: 0.13095153868198395
+# byte_rate 128 L2 loss: 0.1309514343738556
+# byte_rate 256 L2 loss: 0.00018058523710351437
 
 
 # def calc_acc_reid(query, gallary, labels):
