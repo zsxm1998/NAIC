@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from random import random
+from math import log2
 
 from .backbones.efficientnet import efficientnet_b4, efficientnet_b5
 from .backbones.resnet import resnet50
@@ -90,15 +90,15 @@ class AEModel(nn.Module):
         return self.extractor(imgs)
 
     def compress(self, feas, byte_rate):
-        i = byte_rate // self.byte_rate_base - 1
+        i = int(log2(byte_rate//self.byte_rate_base))
         return self.encoders[i](feas).half()
 
     def reconstract(self, feas, byte_rate):
-        i = byte_rate // self.byte_rate_base - 1
+        i = int(log2(byte_rate//self.byte_rate_base))
         return self.decoders[i](feas)
 
     def reid(self, feas, byte_rate):
-        i = byte_rate // self.byte_rate_base - 1
+        i = int(log2(byte_rate//self.byte_rate_base))
         return self.bottlenecks[i](feas)
 
     def load_param(self, state_path):

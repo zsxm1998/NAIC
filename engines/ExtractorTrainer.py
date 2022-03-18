@@ -46,7 +46,7 @@ class ExtractorTrainer(BaseTrainer):
         self.train_transform = T.Compose([
             T.Resize([256, 128]),
             T.RandomHorizontalFlip(p=0.5),
-            T.RandomApply([T.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.6),
+            #T.RandomApply([T.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.6),
             T.Pad(10),
             T.RandomCrop([256, 128]),
             T.ToTensor(),
