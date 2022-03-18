@@ -1,6 +1,6 @@
 from project_ae.extract import extract
-from project_ae.compress import compress
-from project_ae.reconstruct import reconstruct
+from project_fast_ae.compress import compress
+from project_fast_ae.reconstruct import reconstruct
 from project_ae.reid import reid
 
 import os
@@ -14,8 +14,8 @@ import time
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 root = '/nfs3-p1/zsxm/naic/rematch/test'
 
-# extract(root=root)
-# os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
+extract(root=root)
+os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
 t1 = time.time()
 for byte_rate in ['64', '128', '256']:
