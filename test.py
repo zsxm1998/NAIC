@@ -12,5 +12,9 @@
 # decoder.load_state_dict(torch.load('zstage/project/Decoder_32_best.pth'))
 
 import torch
-s = torch.load('.details/checkpoints/efficientnet_b4.pth')
-print(type(s))
+from models.ae import AEModel
+
+m = AEModel("efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')", 1024, 32)
+for k in m.state_dict().keys():
+    if 'num' in k:
+        print(k)

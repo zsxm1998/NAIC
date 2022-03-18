@@ -112,6 +112,7 @@ class EndToEndTrainer(BaseTrainer):
         Batch size:      {opt.batch_size}
         Learning rate:   {opt.lr}
         Training size:   {self.n_train}
+        Training pid:    {len(self.train_dataset.pids)}
         Validation size: {self.n_val}
         Checkpoints:     {opt.save_cp}
         Device:          {self.device.type}
@@ -157,10 +158,10 @@ class EndToEndTrainer(BaseTrainer):
                         epoch_t_loss += t_loss.item() * labels.size(0)
                         epoch_cen_loss += cen_loss.item() * labels.size(0)
                         epoch_i_loss += i_loss.item() * labels.size(0)
-                        epoch_re_loss += re_loss * labels.size(0)
-                        epoch_re2_loss += re2_loss * labels.size(0)
-                        epoch_tr_loss += tr_loss * labels.size(0)
-                        epoch_tr2_loss += tr2_loss * labels.size(0)
+                        epoch_re_loss += re_loss.item() * labels.size(0)
+                        epoch_re2_loss += re2_loss.item() * labels.size(0)
+                        epoch_tr_loss += tr_loss.item() * labels.size(0)
+                        epoch_tr2_loss += tr2_loss.item() * labels.size(0)
                         epoch_count += labels.size(0)
                         pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
                                          'triplet': t_loss.item(), 
@@ -305,7 +306,7 @@ class EndToEndTrainer(BaseTrainer):
             label = labels[i]
             rank_label = np.take_along_axis(labels, rank, axis=0)
             if rank_label[0] == label:
-               acc1 += 1 
+                acc1 += 1 
             correct_rank_idx = np.argwhere(rank_label==label).flatten()
             correct_rank_idx = correct_rank_idx[correct_rank_idx<100]
             n_correct = len(correct_rank_idx)
