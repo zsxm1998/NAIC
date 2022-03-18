@@ -1,9 +1,0 @@
-info: 只取非零的463维度
-device: 0
-epochs: 1000
-early_stopping: 100
-batch_size: 512
-lr: 0.1
-source: /nfs3-p2/zsxm/naic/preliminary/train/
-save_cp: false
-load_model: False
