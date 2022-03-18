@@ -242,4 +242,5 @@ class End2EndTrainer(BaseTrainer):
         return mAP, reconstruction_loss
 
     def __del__(self):
+        del self.train_loader, self.val_loader
         super(End2EndTrainer, self).__del__()

@@ -253,7 +253,6 @@ class AETrainer(BaseTrainer):
                     ranks = np.argsort(-dists, axis=1)
                 finally:
                     del dists, features
-                    torch.cuda.empty_cache()
             else:
                 dists = np.matmul(features, features.T)
                 ranks = np.argsort(-dists, axis=1)
@@ -284,4 +283,5 @@ class AETrainer(BaseTrainer):
         return ACC_reids
 
     def __del__(self):
+        del self.train_loader, self.val_loader
         super(AETrainer, self).__del__()

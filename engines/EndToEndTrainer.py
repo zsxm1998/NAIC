@@ -106,6 +106,7 @@ class EndToEndTrainer(BaseTrainer):
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp
         self.early_stopping = opt.early_stopping
+        self.eval_on_gpu = opt.eval_on_gpu
         self.training_info = opt.info
 
         self.logger.info(f'''Starting training net:
@@ -273,8 +274,6 @@ class EndToEndTrainer(BaseTrainer):
                 imgs = imgs.to(self.device)
                 label_list.append(labels.numpy())
             
-                # features = self.net.extractor(imgs)
-                # features_reco = self.net.decoder(self.net.encoder(features).half().float())
                 features, _, features_reco, features_reco2 = self.net(imgs)
                 reconstruction_loss += self.criterion_recons(features_reco, features).item() * labels.shape[0]
                 reconstruction_loss2 += self.criterion_recons(features_reco2, features).item() * labels.shape[0]
@@ -290,16 +289,26 @@ class EndToEndTrainer(BaseTrainer):
         features_reco = np.concatenate(feature_reco_list, axis=0)
         labels = np.concatenate(label_list, axis=0)
         del feature_list, feature_reco_list, label_list
-        dists = np.matmul(features_reco, features.T)
-        ranks = np.argsort(-dists, axis=1)
-        del dists, features, features_reco
-        # features = torch.cat(feature_list, dim=0)
-        # labels = np.concatenate(label_list, axis=0)
-        # del feature_list, label_list
-        # dists = torch.mm(features, features.T)
-        # ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
-        # del dists, features
 
+        if self.eval_on_gpu:
+            try:
+                features_t = torch.from_numpy(features).to(self.device)
+                features_reco_t = torch.from_numpy(features_reco).to(self.device)
+                dists = torch.mm(features_reco_t, features_t.T)
+                ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
+                del features_t, features_reco_t
+            except RuntimeError as e:
+                self.eval_on_gpu = False
+                self.logger.info(f'Except [{e}], change eval_on_gpu to False')
+                dists = np.matmul(features_reco, features.T)
+                ranks = np.argsort(-dists, axis=1)
+            finally:
+                del dists, features, features_reco
+        else:
+            dists = np.matmul(features_reco, features.T)
+            ranks = np.argsort(-dists, axis=1)
+            del dists, features, features_reco
+        
         acc1, mAP = 0, 0
         for i, rank in enumerate(ranks):
             ap = 0
@@ -380,4 +389,5 @@ class EndToEndTrainer(BaseTrainer):
     #     return mAP, reconstruction_loss
 
     def __del__(self):
+        del self.train_loader, self.val_loader
         super(EndToEndTrainer, self).__del__()

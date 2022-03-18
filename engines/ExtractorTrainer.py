@@ -249,7 +249,6 @@ class ExtractorTrainer(BaseTrainer):
                 ranks = np.argsort(-dists, axis=1)
             finally:
                 del dists, features
-                torch.cuda.empty_cache()
         else:
             dists = np.matmul(features, features.T)
             ranks = np.argsort(-dists, axis=1)
@@ -281,4 +280,5 @@ class ExtractorTrainer(BaseTrainer):
         return ACC_reid
 
     def __del__(self):
+        del self.train_loader, self.val_loader
         super(ExtractorTrainer, self).__del__()

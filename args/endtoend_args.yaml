@@ -10,6 +10,7 @@ lr: 0.00035
 weight_decay: 0.0005
 warm_up_step: 10
 source: /nfs3-p1/zsxm/naic/rematch/multidataset_trans
+eval_on_gpu: True
 save_cp: false
 start_epoch: 0
 load_model: False

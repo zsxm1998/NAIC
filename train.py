@@ -17,10 +17,13 @@ def get_args():
 if __name__ == '__main__':
     opt = get_args()
     if opt.endtoend == True:
-        EndToEndTrainer().train()
+        trainer = EndToEndTrainer()
     elif opt.extractor == True:
-        ExtractorTrainer().train()
+        trainer = ExtractorTrainer()
     elif opt.ae == True:
-        AETrainer().train()
+        trainer = AETrainer()
     else:
         ValueError('需要传参选择要训练的模型！')
+
+    trainer.train()
+    del trainer
