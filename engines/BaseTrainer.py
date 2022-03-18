@@ -43,6 +43,7 @@ class BaseTrainer(ABC):
         self.writer = SummaryWriter(log_dir=f'.details/runs/{self.logger.train_time_str}')
         self.checkpoint_dir = os.path.join('.details/checkpoints/', checkpoint_root, self.logger.train_time_str+'/')
         os.makedirs(self.checkpoint_dir)
+        self.training_info = ''
 
     @abstractmethod
     def __del__(self):
@@ -52,6 +53,7 @@ class BaseTrainer(ABC):
             os.rmdir(self.checkpoint_dir)
             self.logger.info('Remove self.checkpoint_dir')
         gc.collect()
+        print(self.training_info)
 
     @abstractmethod
     def train(self):

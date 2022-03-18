@@ -105,6 +105,7 @@ class AETrainer(BaseTrainer):
         self.save_cp = opt.save_cp
         self.early_stopping = opt.early_stopping
         self.eval_on_gpu = opt.eval_on_gpu
+        self.training_info = opt.info
 
         self.logger.info(f'''Starting training net:
         Epochs:          {opt.epochs}

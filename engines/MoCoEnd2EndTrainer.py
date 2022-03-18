@@ -74,6 +74,7 @@ class End2EndTrainer(BaseTrainer):
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp
         self.early_stopping = opt.early_stopping
+        self.training_info = opt.info
 
         self.logger.info(f'''Starting training net:
         Epochs:          {opt.epochs}
