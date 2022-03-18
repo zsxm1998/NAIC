@@ -1,7 +1,7 @@
-from project_fast_ae.extract import extract
-from project_fast_ae.compress import compress
-from project_fast_ae.reconstruct import reconstruct
-from project_ae.reid import reid
+from project_huffman.extract import extract
+from project_huffman.compress import compress
+from project_huffman.reconstruct import reconstruct
+from project_huffman.reid import reid
 
 import os
 import torch
@@ -14,55 +14,43 @@ import time
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 root = '/nfs3-p1/zsxm/naic/rematch/test'
 
-extract(root=root)
-os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
+# extract(root=root)
+# os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
-# t1 = time.time()
-# for byte_rate in ['64', '128', '256']:
-#     compress(byte_rate, root=root)
+t1 = time.time()
+for byte_rate in ['64', '128', '256']:
+    compress(byte_rate, root=root)
 
-# for byte_rate in ['64', '128', '256']:
-#     reconstruct(byte_rate, root=root)
-# print(time.time()-t1)
+for byte_rate in ['64', '128', '256']:
+    reconstruct(byte_rate, root=root)
+print(time.time()-t1)
 
 
-# class L2ReconstructionLoss(nn.Module):
-#     def __init__(self):
-#         super(L2ReconstructionLoss, self).__init__()
+class L2ReconstructionLoss(nn.Module):
+    def __init__(self):
+        super(L2ReconstructionLoss, self).__init__()
 
-#     def forward(self, reconstructed, origin):
-#         assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
-#         return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
+    def forward(self, reconstructed, origin):
+        assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
+        return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
 
-# file_list = sorted(os.listdir(os.path.join(root, 'query_feature')))
-# feature_list = []
-# for file in file_list:
-#     feature_list.append(np.fromfile(os.path.join(root, 'query_feature', file), dtype='<f4')[:128])
-# features = torch.from_numpy(np.stack(feature_list, axis=0))
-# del feature_list
-# for byte_rate in ['64', '128', '256']:
-#     reconstruct_feature_list = []
-#     for file in file_list:
-#         reconstruct_feature_list.append(np.fromfile(os.path.join(root, 'reconstructed_query_feature', byte_rate, file), dtype='<f4')[:128])
-#     reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
-#     del reconstruct_feature_list
-#     print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
-# AE 时间 256.0719175338745
-# byte_rate 64 L2 loss: 0.13094088435173035
-# byte_rate 128 L2 loss: 0.13094089925289154
-# byte_rate 256 L2 loss: 0.00017850534641183913
-# huffman 时间 522.4919316768646
-# byte_rate 64 L2 loss: 0.5273605585098267
-# byte_rate 128 L2 loss: 0.08254222571849823
-# byte_rate 256 L2 loss: 0.00017850534641183913
-# AE+原始字典压缩 时间 1731.4566342830658
-# byte_rate 64 L2 loss: 0.131012424826622
-# byte_rate 128 L2 loss: 0.13101236522197723
-# byte_rate 256 L2 loss: 0.00017850534641183913
-# AE+改进字典压缩 时间 465.51395773887634
-# byte_rate 64 L2 loss: 0.13095153868198395
-# byte_rate 128 L2 loss: 0.1309514343738556
-# byte_rate 256 L2 loss: 0.00018058523710351437
+file_list = sorted(os.listdir(os.path.join(root, 'query_feature')))
+feature_list = []
+for file in file_list:
+    feature_list.append(np.fromfile(os.path.join(root, 'query_feature', file), dtype='<f4')[:128])
+features = torch.from_numpy(np.stack(feature_list, axis=0))
+del feature_list
+for byte_rate in ['64', '128', '256']:
+    reconstruct_feature_list = []
+    for file in file_list:
+        reconstruct_feature_list.append(np.fromfile(os.path.join(root, 'reconstructed_query_feature', byte_rate, file), dtype='<f4')[:128])
+    reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
+    del reconstruct_feature_list
+    print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
+# huffman 470.00023436546326
+# byte_rate 64 L2 loss: 0.4872712790966034
+# byte_rate 128 L2 loss: 0.10426277667284012
+# byte_rate 256 L2 loss: 0.00046082952758297324
 
 
 # def calc_acc_reid(query, gallary, labels):
@@ -169,6 +157,22 @@ os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 #     mAP /= len(res)
 #     ACC_reid = (acc1 + mAP) / 2
 #     print(f'{byte_rate}', ACC_reid, acc1, mAP)
+# 64 0.9807328575112684 0.9901539649596989 0.9713117500628378
+# 128 0.9827711974760378 0.9923741493315315 0.9731682456205443
+# 256 0.9829542702954991 0.992518943964477 0.9733895966265211
+
+
+
+
+
+
+
+
+
+
+
+
+
 # pearson
 # 64 0.9426747695268491 0.9694965973261258 0.9158529417275725
 # 128 0.9426741014818318 0.9694965973261258 0.9158516056375379

@@ -6,11 +6,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+DIM_NUM = 128
 WEIGHT = [0.02, 0.56, 0.24, 0.1, 0.02, 0.01, 0.02, 0.02, 0.02]
 # WEIGHT = [0.3, 0.6, 0.1]
 
 def read_feature_file(path: str) -> np.ndarray:
-    return np.fromfile(path, dtype='<f4')[:128]
+    return np.fromfile(path, dtype='<f4')[:DIM_NUM]
 
 def l2_dist(q, k):
     return torch.linalg.norm(q.unsqueeze(-2) - k.unsqueeze(0), dim=-1, ord=2)
@@ -25,7 +26,7 @@ def pearson_similarity(q, k):
     k = k - k.mean(dim=-1, keepdim=True)
     return cosine_similarity(q, k)
 
-def reid(bytes_rate, root='', method='rerank_pearson'):
+def reid(bytes_rate, root='', method='rerank_l2'):
     reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
     gallery_fea_dir = 'gallery_feature' if root == '' else os.path.join(root, 'query_feature')
     reid_results_path = os.path.join(root, 'reid_results/{}.json'.format(bytes_rate))

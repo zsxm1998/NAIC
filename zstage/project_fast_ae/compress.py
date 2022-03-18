@@ -8,6 +8,10 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
 
+DIM_NUM = 128
+BATCH_SIZE = 512
+
+
 class FeatureDataset(Dataset):
     def __init__(self, file_dir):
         self.query_fea_paths = glob.glob(os.path.join(file_dir, '*.*'))
@@ -16,7 +20,7 @@ class FeatureDataset(Dataset):
         return len(self.query_fea_paths)
 
     def __getitem__(self, index):
-        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))[:128]
+        vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f4'))[:DIM_NUM]
         basename = os.path.splitext(os.path.basename(self.query_fea_paths[index]))[0]
         return vector, basename
 
@@ -45,13 +49,13 @@ def compress(bytes_rate, root=''):
     os.makedirs(compressed_query_fea_dir, exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    encoder = Encoder(32, 128)
+    encoder = Encoder(32, DIM_NUM)
     encoder.load_state_dict(torch.load(os.path.join(root, f'project/Encoder_32_best.pth')))
     encoder.to(device)
     encoder.eval()
 
     featuredataset = FeatureDataset(query_fea_dir)
-    featureloader = DataLoader(featuredataset, batch_size=512, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     for vector, basename in featureloader:
         if bytes_rate != 256:

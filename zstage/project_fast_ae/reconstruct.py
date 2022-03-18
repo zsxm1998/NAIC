@@ -7,6 +7,10 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
 
+DIM_NUM = 128
+BATCH_SIZE = 512
+
+
 def get_file_basename(path: str) -> str:
     return os.path.splitext(os.path.basename(path))[0]
 
@@ -78,13 +82,13 @@ def reconstruct(bytes_rate, root=''):
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    decoder = Decoder(32, 128)
+    decoder = Decoder(32, DIM_NUM)
     decoder.load_state_dict(torch.load(os.path.join(root, f'project/Decoder_32_best.pth')))
     decoder.to(device)
     decoder.eval()
 
     featuredataset = FeatureDataset(compressed_query_fea_dir, bytes_rate=bytes_rate)
-    featureloader = DataLoader(featuredataset, batch_size=512, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     for vector, basename in featureloader:
         if bytes_rate != 256:
@@ -94,7 +98,7 @@ def reconstruct(bytes_rate, root=''):
             reconstructed = vector
         
         expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
-        expand_r[:, :128] = reconstructed
+        expand_r[:, :DIM_NUM] = reconstructed
         expand_r = expand_r.numpy().astype('<f4')
 
         for i, bname in enumerate(basename):

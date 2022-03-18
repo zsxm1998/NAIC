@@ -9,6 +9,10 @@ from torch.utils.data import Dataset, DataLoader
 import six
 
 
+DIM_NUM = 128
+BATCH_SIZE = 512
+
+
 class FeatureDataset(Dataset):
     def __init__(self, file_dir):
         self.query_fea_paths = glob.glob(os.path.join(file_dir, '*.*'))
@@ -44,7 +48,7 @@ def compress(bytes_rate, root=''):
 
     for vector, basename in featureloader:
         if bytes_rate != 256:
-            vector = vector[:, :128]
+            vector = vector[:, :DIM_NUM]
             if bytes_rate == 64:
                 bname = basename[0]
                 compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
@@ -118,7 +122,7 @@ def compress(bytes_rate, root=''):
                     if output_len < 128:
                         f.write(six.int2byte(out))
         else:
-            compressed = vector[:, :128].half().numpy().astype('<f2')
+            compressed = vector[:, :DIM_NUM].half().numpy().astype('<f2')
             for i, bname in enumerate(basename):
                 compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
                 # with open(compressed_fea_path, 'wb') as bf:

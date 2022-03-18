@@ -13,7 +13,7 @@ gamma: 0.1
 warmup_factor: 0.01
 warmup_iters: 10
 source: /nfs3-p2/zsxm/naic/rematch/multidataset_trans
-eval_on_gpu: True
+eval_on_gpu: False
 save_cp: false
 start_epoch: 0
 load_model: False
