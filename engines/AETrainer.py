@@ -144,8 +144,6 @@ class AETrainer(BaseTrainer):
                         loss = sum(t_loss) + 0.0005*sum(c_loss) + sum(i_loss)
                         
                         epoch_count += labels.size(0)
-                        postfix = OrderedDict()
-                        postfix['loss'] = loss.item()
                         for i in range(self.byte_rate_category):
                             self.writer.add_scalar(f'Train_Loss/triplet_loss_{self.byte_rate_base*2**i}', t_loss[i].item(), global_step)
                             self.writer.add_scalar(f'Train_Loss/center_loss_{self.byte_rate_base*2**i}', c_loss[i].item(), global_step)
@@ -153,9 +151,11 @@ class AETrainer(BaseTrainer):
                             epoch_t_loss[i] += t_loss[i].item() * labels.size(0)
                             epoch_c_loss[i] += c_loss[i].item() * labels.size(0)
                             epoch_i_loss[i] += i_loss[i].item() * labels.size(0)
-                            postfix[f't_{i}'] = t_loss[i].item()
-                            postfix[f'c_{i}'] = c_loss[i].item()
-                            postfix[f'i_{i}'] = i_loss[i].item()
+                        postfix = OrderedDict()
+                        postfix['loss'] = loss.item()
+                        postfix['triplet'] = [round(l.item(), 4) for l in t_loss]
+                        postfix['center'] = [round(l.item(), 4) for l in c_loss]
+                        postfix['identity'] = [round(l.item(), 4) for l in i_loss]
                         pbar.set_postfix(postfix)
 
                         self.optimizer.zero_grad()

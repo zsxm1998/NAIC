@@ -1,4 +1,4 @@
-from project_ae.extract import extract
+from project_fast_ae.extract import extract
 from project_fast_ae.compress import compress
 from project_fast_ae.reconstruct import reconstruct
 from project_ae.reid import reid
@@ -17,36 +17,36 @@ root = '/nfs3-p1/zsxm/naic/rematch/test'
 extract(root=root)
 os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
-t1 = time.time()
-for byte_rate in ['64', '128', '256']:
-    compress(byte_rate, root=root)
+# t1 = time.time()
+# for byte_rate in ['64', '128', '256']:
+#     compress(byte_rate, root=root)
 
-for byte_rate in ['64', '128', '256']:
-    reconstruct(byte_rate, root=root)
-print(time.time()-t1)
+# for byte_rate in ['64', '128', '256']:
+#     reconstruct(byte_rate, root=root)
+# print(time.time()-t1)
 
 
-class L2ReconstructionLoss(nn.Module):
-    def __init__(self):
-        super(L2ReconstructionLoss, self).__init__()
+# class L2ReconstructionLoss(nn.Module):
+#     def __init__(self):
+#         super(L2ReconstructionLoss, self).__init__()
 
-    def forward(self, reconstructed, origin):
-        assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
-        return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
+#     def forward(self, reconstructed, origin):
+#         assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
+#         return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
 
-file_list = sorted(os.listdir(os.path.join(root, 'query_feature')))
-feature_list = []
-for file in file_list:
-    feature_list.append(np.fromfile(os.path.join(root, 'query_feature', file), dtype='<f4')[:128])
-features = torch.from_numpy(np.stack(feature_list, axis=0))
-del feature_list
-for byte_rate in ['64', '128', '256']:
-    reconstruct_feature_list = []
-    for file in file_list:
-        reconstruct_feature_list.append(np.fromfile(os.path.join(root, 'reconstructed_query_feature', byte_rate, file), dtype='<f4')[:128])
-    reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
-    del reconstruct_feature_list
-    print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
+# file_list = sorted(os.listdir(os.path.join(root, 'query_feature')))
+# feature_list = []
+# for file in file_list:
+#     feature_list.append(np.fromfile(os.path.join(root, 'query_feature', file), dtype='<f4')[:128])
+# features = torch.from_numpy(np.stack(feature_list, axis=0))
+# del feature_list
+# for byte_rate in ['64', '128', '256']:
+#     reconstruct_feature_list = []
+#     for file in file_list:
+#         reconstruct_feature_list.append(np.fromfile(os.path.join(root, 'reconstructed_query_feature', byte_rate, file), dtype='<f4')[:128])
+#     reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
+#     del reconstruct_feature_list
+#     print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
 # AE 时间 256.0719175338745
 # byte_rate 64 L2 loss: 0.13094088435173035
 # byte_rate 128 L2 loss: 0.13094089925289154

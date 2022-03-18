@@ -9,7 +9,7 @@ from torchvision import transforms as T
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .efficientnet import efficientnet_b4
+from .efficientnet import efficientnet_b4, efficientnet_b5
 
 
 def get_file_basename(path: str) -> str:
@@ -70,7 +70,7 @@ def extract(root=''):
 
     dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=128, num_workers=8)
-    extractor = efficientnet_b4(num_classes=128)
+    extractor = efficientnet_b5(num_classes=128)
     extractor.load_state_dict(torch.load(os.path.join(root, 'project/Extractor_128_best.pth')))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     extractor.to(device)

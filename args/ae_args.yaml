@@ -1,6 +1,7 @@
-info: 只训练特征提取，efficientnet_b4输出180维，优化器换Ranger，增加自然数据集，增加T.ColorJitter(0.4, 0.4, 0.4, 0.1)，p=0.6
+info: 三个线性AE，efficientnet_b4输出1024维，增加迁移数据集
 model_name: efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')
-feature_dim: 180
+feature_dim: 1024
+compress_dim: 32
 device: 2
 epochs: 120
 early_stopping: 0
@@ -11,7 +12,7 @@ milestones: [30, 55]
 gamma: 0.1
 warmup_factor: 0.01
 warmup_iters: 10
-source: /disk1/zsxm/datasets/naic/multidataset
+source: /nfs3-p2/zsxm/naic/rematch/multidataset_trans
 eval_on_gpu: True
 save_cp: false
 start_epoch: 0
