@@ -132,39 +132,40 @@ class AETrainer(BaseTrainer):
                 epoch_c_loss = [0] * self.byte_rate_category
                 epoch_i_loss = [0] * self.byte_rate_category
                 epoch_count = 0
-                with tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img') as pbar:
-                    for imgs, labels in self.train_loader:
-                        global_step += 1
-                        imgs, labels = imgs.to(self.device), labels.to(self.device)
+                pbar = tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img')
+                for imgs, labels in self.train_loader:
+                    global_step += 1
+                    imgs, labels = imgs.to(self.device), labels.to(self.device)
 
-                        f_g, f_c = self.net(imgs)
-                        t_loss = [self.criterion_triplet(f_g[i], labels)[0] for i in range(self.byte_rate_category)]
-                        c_loss = [self.criterion_center(f_g[i], labels) for i in range(self.byte_rate_category)]
-                        i_loss = [self.criterion_identity(f_c[i], labels) for i in range(self.byte_rate_category)]
+                    f_g, f_c = self.net(imgs)
+                    t_loss = [self.criterion_triplet(f_g[i], labels)[0] for i in range(self.byte_rate_category)]
+                    c_loss = [self.criterion_center(f_g[i], labels) for i in range(self.byte_rate_category)]
+                    i_loss = [self.criterion_identity(f_c[i], labels) for i in range(self.byte_rate_category)]
 
-                        loss = sum(t_loss) + 0.0005*sum(c_loss) + sum(i_loss)
-                        
-                        epoch_count += labels.size(0)
-                        for i in range(self.byte_rate_category):
-                            self.writer.add_scalar(f'Train_Loss/triplet_loss_{self.byte_rate_base*2**i}', t_loss[i].item(), global_step)
-                            self.writer.add_scalar(f'Train_Loss/center_loss_{self.byte_rate_base*2**i}', c_loss[i].item(), global_step)
-                            self.writer.add_scalar(f'Train_Loss/identity_loss_{self.byte_rate_base*2**i}', i_loss[i].item(), global_step)
-                            epoch_t_loss[i] += t_loss[i].item() * labels.size(0)
-                            epoch_c_loss[i] += c_loss[i].item() * labels.size(0)
-                            epoch_i_loss[i] += i_loss[i].item() * labels.size(0)
-                        postfix = OrderedDict()
-                        postfix['loss'] = loss.item()
-                        postfix['triplet'] = [round(l.item(), 4) for l in t_loss]
-                        postfix['center'] = [round(l.item(), 4) for l in c_loss]
-                        postfix['identity'] = [round(l.item(), 4) for l in i_loss]
-                        pbar.set_postfix(postfix)
+                    loss = sum(t_loss) + 0.0005*sum(c_loss) + sum(i_loss)
+                    
+                    epoch_count += labels.size(0)
+                    for i in range(self.byte_rate_category):
+                        self.writer.add_scalar(f'Train_Loss/triplet_loss_{self.byte_rate_base*2**i}', t_loss[i].item(), global_step)
+                        self.writer.add_scalar(f'Train_Loss/center_loss_{self.byte_rate_base*2**i}', c_loss[i].item(), global_step)
+                        self.writer.add_scalar(f'Train_Loss/identity_loss_{self.byte_rate_base*2**i}', i_loss[i].item(), global_step)
+                        epoch_t_loss[i] += t_loss[i].item() * labels.size(0)
+                        epoch_c_loss[i] += c_loss[i].item() * labels.size(0)
+                        epoch_i_loss[i] += i_loss[i].item() * labels.size(0)
+                    postfix = OrderedDict()
+                    postfix['loss'] = loss.item()
+                    postfix['triplet'] = [round(l.item(), 4) for l in t_loss]
+                    postfix['center'] = [round(l.item(), 4) for l in c_loss]
+                    postfix['identity'] = [round(l.item(), 4) for l in i_loss]
+                    pbar.set_postfix(postfix)
 
-                        self.optimizer.zero_grad()
-                        loss.backward()
-                        # nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
-                        self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    # nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
+                    self.optimizer.step()
 
-                        pbar.update(labels.shape[0])
+                    pbar.update(labels.shape[0])
+                pbar.close()
 
                 for i in range(self.byte_rate_category):
                     epoch_t_loss[i] /= epoch_count
@@ -218,6 +219,7 @@ class AETrainer(BaseTrainer):
 
             except KeyboardInterrupt:
                 self.logger.info('Receive KeyboardInterrupt, stop training...')
+                pbar.close()
                 break
 
     @torch.no_grad()

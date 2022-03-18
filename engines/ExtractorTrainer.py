@@ -128,39 +128,40 @@ class ExtractorTrainer(BaseTrainer):
                 self.net.train()
                 epoch_t_loss, epoch_cen_loss, epoch_i_loss = 0, 0, 0
                 epoch_count = 0
-                with tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img') as pbar:
-                    for imgs, labels in self.train_loader:
-                        global_step += 1
-                        imgs, labels = imgs.to(self.device), labels.to(self.device)
+                pbar =  tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img')
+                for imgs, labels in self.train_loader:
+                    global_step += 1
+                    imgs, labels = imgs.to(self.device), labels.to(self.device)
 
-                        ft, fi = self.net(imgs)
+                    ft, fi = self.net(imgs)
 
-                        t_loss = self.criterion_triplet(ft, labels)[0]
-                        cen_loss = self.criterion_center(ft, labels)
-                        i_loss = self.criterion_identity(fi, labels)
+                    t_loss = self.criterion_triplet(ft, labels)[0]
+                    cen_loss = self.criterion_center(ft, labels)
+                    i_loss = self.criterion_identity(fi, labels)
 
-                        loss = t_loss + 0.0005*cen_loss + i_loss
-                        
-                        self.writer.add_scalar('Train_Loss/triplet_loss', t_loss.item(), global_step)
-                        self.writer.add_scalar('Train_Loss/center_loss', cen_loss.item(), global_step)
-                        self.writer.add_scalar('Train_Loss/identity_loss', i_loss.item(), global_step)
-                        self.writer.add_scalar('Train_Loss/Step_Loss', loss.item(), global_step)
-                        epoch_t_loss += t_loss.item() * labels.size(0)
-                        epoch_cen_loss += cen_loss.item() * labels.size(0)
-                        epoch_i_loss += i_loss.item() * labels.size(0)
-                        epoch_count += labels.size(0)
-                        pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
-                                         'triplet': t_loss.item(), 
-                                         'center': cen_loss.item(), 
-                                         'identity': i_loss.item(),
-                                        }))
+                    loss = t_loss + 0.0005*cen_loss + i_loss
+                    
+                    self.writer.add_scalar('Train_Loss/triplet_loss', t_loss.item(), global_step)
+                    self.writer.add_scalar('Train_Loss/center_loss', cen_loss.item(), global_step)
+                    self.writer.add_scalar('Train_Loss/identity_loss', i_loss.item(), global_step)
+                    self.writer.add_scalar('Train_Loss/Step_Loss', loss.item(), global_step)
+                    epoch_t_loss += t_loss.item() * labels.size(0)
+                    epoch_cen_loss += cen_loss.item() * labels.size(0)
+                    epoch_i_loss += i_loss.item() * labels.size(0)
+                    epoch_count += labels.size(0)
+                    pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
+                                        'triplet': t_loss.item(), 
+                                        'center': cen_loss.item(), 
+                                        'identity': i_loss.item(),
+                                    }))
 
-                        self.optimizer.zero_grad()
-                        loss.backward()
-                        # nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
-                        self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    # nn.utils.clip_grad_value_(self.net.parameters(), 0.1)
+                    self.optimizer.step()
 
-                        pbar.update(labels.shape[0])
+                    pbar.update(labels.shape[0])
+                pbar.close()
 
                 epoch_t_loss /= epoch_count
                 epoch_cen_loss /= epoch_count
@@ -213,6 +214,7 @@ class ExtractorTrainer(BaseTrainer):
 
             except KeyboardInterrupt:
                 self.logger.info('Receive KeyboardInterrupt, stop training...')
+                pbar.close()
                 break
 
     @torch.no_grad()
