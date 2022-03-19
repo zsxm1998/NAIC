@@ -6,9 +6,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from .ae import AEModel
+
 DIM_NUM = 1024
+BATCH_SIZE = 512
+L2_BATCH_SIZE = 6
 WEIGHT = [0.02, 0.56, 0.24, 0.1, 0.02, 0.01, 0.02, 0.02, 0.02]
-# WEIGHT = [0.3, 0.6, 0.1]
 
 def read_feature_file(path: str) -> np.ndarray:
     return np.fromfile(path, dtype='<f4')[:DIM_NUM]
@@ -26,7 +29,10 @@ def pearson_similarity(q, k):
     k = k - k.mean(dim=-1, keepdim=True)
     return cosine_similarity(q, k)
 
-def reid(bytes_rate, root='', method='rerank_pearson'):
+@torch.no_grad()
+def reid(bytes_rate, root='', method='rerank_l2', after=True):
+    if not isinstance(bytes_rate, int):
+        bytes_rate = int(bytes_rate)
     reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
     gallery_fea_dir = 'gallery_feature' if root == '' else os.path.join(root, 'query_feature')
     reid_results_path = os.path.join(root, 'reid_results/{}.json'.format(bytes_rate))
@@ -40,7 +46,7 @@ def reid(bytes_rate, root='', method='rerank_pearson'):
     query_num = len(query_names)
     gallery_num = len(gallery_names)
     assert(query_num != 0 and gallery_num != 0)
-
+    top_num = min(100, gallery_num)
     reconstructed_query_fea_list = []
     gallery_fea_list = []
     for query_name in query_names:
@@ -51,12 +57,43 @@ def reid(bytes_rate, root='', method='rerank_pearson'):
         gallery_fea_list.append(
             read_feature_file(os.path.join(gallery_fea_dir, gallery_name))
         )
-
     reconstructed_query_fea_all = torch.from_numpy(np.stack(reconstructed_query_fea_list, axis=0)).to(device)
     gallery_fea_all = torch.from_numpy(np.stack(gallery_fea_list, axis=0)).to(device)
-    top_num = min(100, gallery_num)
     del reconstructed_query_fea_list, gallery_fea_list
     gc.collect()
+
+    ae_net = AEModel('efficientnet_b4(num_classes={})', extractor_out_dim=DIM_NUM, compress_dim=32)
+    ae_net.load_param(os.path.join(root, f'project/Net_best.pth'))
+    ae_net.to(device)
+    ae_net.eval()
+    reco_gallery_list = []
+    for i in range(0, gallery_num, BATCH_SIZE):
+        j = min(i+BATCH_SIZE, gallery_num)
+        reco_gallery_list.append(ae_net.ae(gallery_fea_all[i:j], bytes_rate))
+    del gallery_fea_all
+    torch.cuda.empty_cache()
+    gallery_fea_all = torch.cat(reco_gallery_list, dim=0).to(device)
+    del reco_gallery_list
+
+    if after:
+        bn_query_list = []
+        for i in range(0, query_num, BATCH_SIZE):
+            j = min(i+BATCH_SIZE, query_num)
+            bn_query_list.append(ae_net.bn(reconstructed_query_fea_all[i:j], bytes_rate))
+        del reconstructed_query_fea_all
+        torch.cuda.empty_cache()
+        reconstructed_query_fea_all = torch.cat(bn_query_list, dim=0).to(device)
+        del bn_query_list
+        bn_gallery_list = []
+        for i in range(0, gallery_num, BATCH_SIZE):
+            j = min(i+BATCH_SIZE, gallery_num)
+            bn_gallery_list.append(ae_net.bn(gallery_fea_all[i:j], bytes_rate))
+        del gallery_fea_all
+        torch.cuda.empty_cache()
+        gallery_fea_all = torch.cat(bn_gallery_list, dim=0).to(device)
+        del bn_gallery_list
+    del ae_net
+    torch.cuda.empty_cache()
 
     query_names = [name.rsplit('.', 1)[0] + '.png' for name in query_names]
     gallery_names_array = np.array(list(map(lambda _: _.rsplit('.', 1)[0] + '.png', gallery_names)))
@@ -69,7 +106,7 @@ def reid(bytes_rate, root='', method='rerank_pearson'):
                  'rerank_pearson': pearson_similarity,
                  'rerank_l2': l2_dist,
                 }
-    batch_size = 50 if 'l2' in method else 512
+    batch_size = L2_BATCH_SIZE if 'l2' in method else BATCH_SIZE
     result_dict = {}
     for i in range(0, len(query_names), batch_size):
         j = min(i+batch_size, len(query_names))

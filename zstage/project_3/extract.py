@@ -55,9 +55,10 @@ def extract(root=''):
 
     dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=BATCH_SIZE, num_workers=8)
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     ae_net = AEModel('efficientnet_b4(num_classes={})', extractor_out_dim=DIM_NUM, compress_dim=32)
     ae_net.load_param(os.path.join(root, f'project/Net_best.pth'))
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     ae_net.to(device)
     ae_net.eval()
     for imgs, basenames in dataloader:
