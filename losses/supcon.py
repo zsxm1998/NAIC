@@ -4,13 +4,17 @@ import torch.nn.functional as F
 
 
 class SupConLoss(nn.Module):
-    def __init__(self, temperature=0.07, concat=False, replace=False):
+    def __init__(self, temperature=0.07, concat=False, replace=False, normalize_feature=True):
         super(SupConLoss, self).__init__()
         self.temperature = temperature
         self.concat = concat
         self.replace = replace
+        self.normalize_feature = normalize_feature
 
     def forward(self, q, q_label, k, k_label):
+        if self.normalize_feature:
+            q = F.normalize(q, dim=-1)
+            k = F.normalize(k, dim=-1)
         q_label = q_label.contiguous().view(-1,1)
         k_label = k_label.contiguous().view(-1,1)
         if self.concat:

@@ -19,6 +19,8 @@ from utils.WarmupMultiStepLR import WarmupMultiStepLR
 from losses.triplet import TripletLoss, CenterLoss, CrossEntropyLabelSmooth
 from utils.ranger import Ranger
 from utils.transforms import RandomPermuteChannel
+from losses.supcon import SupConLoss
+from utils.CosineAnnealingWithWarmUpLR import CosineAnnealingWithWarmUpLR
 
 class ExtractorTrainer(BaseTrainer):
     def __init__(self, opt_file='args/extractor_args.yaml'):
@@ -46,7 +48,7 @@ class ExtractorTrainer(BaseTrainer):
         self.train_transform = T.Compose([
             T.Resize([256, 128]),
             T.RandomHorizontalFlip(p=0.5),
-            #T.RandomApply([T.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.6),
+            T.RandomApply([T.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.6),
             T.Pad(10),
             T.RandomCrop([256, 128]),
             T.ToTensor(),
@@ -79,7 +81,10 @@ class ExtractorTrainer(BaseTrainer):
 
         self.net = ExtractorModel(opt.model_name, id_num=len(self.train_dataset.pids), extractor_out_dim=opt.feature_dim)
         if opt.load_model:
-            self.net.load_state_dict(torch.load(opt.load_model, map_location=self.device))
+            try:
+                self.net.load_state_dict(torch.load(opt.load_model))
+            except RuntimeError:
+                self.net.load_param(opt.load_model)
             self.logger.info(f'Model loaded from {opt.load_model}')
         self.net.to(device=self.device)
         if torch.cuda.device_count() > 1 and self.device.type != 'cpu':
@@ -88,7 +93,13 @@ class ExtractorTrainer(BaseTrainer):
         self.net_module = self.net.module if isinstance(self.net, nn.DataParallel) else self.net
 
         self.optimizer = Ranger(self.net.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
-        self.scheduler = WarmupMultiStepLR(self.optimizer, opt.milestones, opt.gamma, opt.warmup_factor, opt.warmup_iters)
+        if opt.scheduler == 'step':
+            self.scheduler = WarmupMultiStepLR(self.optimizer, opt.milestones, opt.gamma, opt.warmup_factor, opt.warmup_iters)
+        elif opt.scheduler == 'cosine':
+            self.scheduler = CosineAnnealingWithWarmUpLR(self.optimizer, T_total=opt.epochs, eta_min=opt.lr/1000, warm_up_lr=opt.lr/100, warm_up_step=opt.warmup_iters)
+        else:
+            raise ValueError(f'opt.scheduler should be either "consine" or "step", but got {opt.scheduler}')
+
         if opt.load_optimizer:
             self.optimizer.load_state_dict(torch.load(opt.load_optimizer))
             self.logger.info(f'Optimizer loaded from {opt.load_optimizer}')
@@ -99,6 +110,7 @@ class ExtractorTrainer(BaseTrainer):
         self.criterion_triplet = TripletLoss(margin=0.3)
         self.criterion_center = CenterLoss(num_classes=len(self.train_dataset.pids), feat_dim=opt.feature_dim)
         self.criterion_identity = CrossEntropyLabelSmooth(num_classes=len(self.train_dataset.pids))
+        self.criterion_supcon = SupConLoss(replace=True)
 
         self.epochs = opt.epochs
         self.save_cp = opt.save_cp
@@ -126,33 +138,37 @@ class ExtractorTrainer(BaseTrainer):
         for epoch in range(self.opt.start_epoch, self.epochs):
             try:
                 self.net.train()
-                epoch_t_loss, epoch_cen_loss, epoch_i_loss = 0, 0, 0
+                epoch_t_loss, epoch_c_loss, epoch_i_loss, epoch_s_loss = 0, 0, 0, 0
                 epoch_count = 0
                 pbar =  tqdm(total=len(self.train_sampler), desc=f'Epoch {epoch + 1}/{self.epochs}', unit='img')
                 for imgs, labels in self.train_loader:
                     global_step += 1
                     imgs, labels = imgs.to(self.device), labels.to(self.device)
 
-                    ft, fi = self.net(imgs)
+                    ft, fb, fi = self.net(imgs)
 
                     t_loss = self.criterion_triplet(ft, labels)[0]
-                    cen_loss = self.criterion_center(ft, labels)
+                    c_loss = self.criterion_center(ft, labels)
                     i_loss = self.criterion_identity(fi, labels)
+                    s_loss = self.criterion_supcon(fb, labels, fb, labels) if epoch >= self.opt.warmup_iters else torch.tensor(0., device=self.device)
 
-                    loss = t_loss + 0.0005*cen_loss + i_loss
+                    loss = t_loss + 0.0005*c_loss + i_loss + s_loss
                     
                     self.writer.add_scalar('Train_Loss/triplet_loss', t_loss.item(), global_step)
-                    self.writer.add_scalar('Train_Loss/center_loss', cen_loss.item(), global_step)
+                    self.writer.add_scalar('Train_Loss/center_loss', c_loss.item(), global_step)
                     self.writer.add_scalar('Train_Loss/identity_loss', i_loss.item(), global_step)
+                    self.writer.add_scalar('Train_Loss/supcon_loss', s_loss.item(), global_step)
                     self.writer.add_scalar('Train_Loss/Step_Loss', loss.item(), global_step)
                     epoch_t_loss += t_loss.item() * labels.size(0)
-                    epoch_cen_loss += cen_loss.item() * labels.size(0)
+                    epoch_c_loss += c_loss.item() * labels.size(0)
                     epoch_i_loss += i_loss.item() * labels.size(0)
+                    epoch_s_loss += s_loss.item() * labels.size(0)
                     epoch_count += labels.size(0)
                     pbar.set_postfix(OrderedDict(**{'loss': loss.item(),
                                         'triplet': t_loss.item(), 
-                                        'center': cen_loss.item(), 
+                                        'center': c_loss.item(), 
                                         'identity': i_loss.item(),
+                                        'supcon': s_loss.item(),
                                     }))
 
                     self.optimizer.zero_grad()
@@ -164,13 +180,15 @@ class ExtractorTrainer(BaseTrainer):
                 pbar.close()
 
                 epoch_t_loss /= epoch_count
-                epoch_cen_loss /= epoch_count
+                epoch_c_loss /= epoch_count
                 epoch_i_loss /= epoch_count
-                epoch_loss = epoch_t_loss + 0.0005*epoch_cen_loss + epoch_i_loss
+                epoch_s_loss /= epoch_count
+                epoch_loss = epoch_t_loss + 0.0005*epoch_c_loss + epoch_i_loss + epoch_s_loss
                 self.logger.info(f'Train epoch {epoch+1} loss: {epoch_loss}, '
-                                 f'triplet loss: {epoch_t_loss}, '
-                                 f'center loss: {epoch_cen_loss}, '
-                                 f'identity loss: {epoch_i_loss}'
+                                 f'triplet: {epoch_t_loss}, '
+                                 f'center: {epoch_c_loss}, '
+                                 f'identity: {epoch_i_loss}, '
+                                 f'supcon: {epoch_s_loss}, '
                                 )
                 self.writer.add_scalar('Train_Loss/Epoch_Loss', epoch_loss, epoch+1)
 
@@ -182,8 +200,8 @@ class ExtractorTrainer(BaseTrainer):
 
                 self.writer.add_scalar('learning_rate', self.optimizer.param_groups[0]['lr'], global_step)
 
-                ACC_reid = self.evaluate()
-                self.logger.info(f'Train epoch {epoch+1} ACC_reid: {ACC_reid}')
+                ACC_reid, acc1, mAP = self.evaluate()
+                self.logger.info(f'Train epoch {epoch+1} ACC_reid: {ACC_reid}, acc1:{acc1}, mAP:{mAP}')
                 self.writer.add_scalar('Val/ACC_reid', ACC_reid, global_step)
 
                 self.scheduler.step()
@@ -203,6 +221,8 @@ class ExtractorTrainer(BaseTrainer):
                     best_val_score = ACC_reid
                     torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_best.pth')
                     torch.save(self.net_module.extractor.state_dict(), self.checkpoint_dir + f'Extractor_{self.opt.feature_dim}_best.pth')
+                    torch.save(self.optimizer.state_dict(), self.checkpoint_dir + 'Optimizer_best.pth')
+                    torch.save(self.scheduler.state_dict(), self.checkpoint_dir + 'Scheduler_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
                 else:
@@ -227,7 +247,7 @@ class ExtractorTrainer(BaseTrainer):
                 imgs = imgs.to(self.device)
                 label_list.append(labels.numpy())
             
-                features, _ = self.net(imgs)
+                features = self.net.extract(imgs, after=True)
 
                 features = F.normalize(features, dim=1).cpu().numpy()
                 feature_list.append(features)
@@ -279,7 +299,7 @@ class ExtractorTrainer(BaseTrainer):
         ACC_reid = (acc1 + mAP) / 2
 
         self.net.train()
-        return ACC_reid
+        return ACC_reid, acc1, mAP
 
     def __del__(self):
         del self.train_loader, self.val_loader
