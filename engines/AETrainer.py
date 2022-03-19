@@ -208,6 +208,8 @@ class AETrainer(BaseTrainer):
                 if val_score > best_val_score:
                     best_val_score = val_score
                     torch.save(self.net_module.state_dict(), self.checkpoint_dir + 'Net_best.pth')
+                    torch.save(self.optimizer.state_dict(), self.checkpoint_dir + 'Optimizer_best.pth')
+                    torch.save(self.scheduler.state_dict(), self.checkpoint_dir + 'Scheduler_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
                 else:

@@ -247,6 +247,8 @@ class EndToEndTrainer(BaseTrainer):
                     torch.save(self.net_module.decoder.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim}_best.pth')
                     torch.save(self.net_module.encoder2.state_dict(), self.checkpoint_dir + f'Encoder_{self.opt.compress_dim*2}_best.pth')
                     torch.save(self.net_module.decoder2.state_dict(), self.checkpoint_dir + f'Decoder_{self.opt.compress_dim*2}_best.pth')
+                    torch.save(self.optimizer.state_dict(), self.checkpoint_dir + 'Optimizer_best.pth')
+                    torch.save(self.scheduler.state_dict(), self.checkpoint_dir + 'Scheduler_best.pth')
                     self.logger.info('Best model saved !')
                     useless_epoch_count = 0
                 else:

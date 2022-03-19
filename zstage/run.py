@@ -61,7 +61,7 @@ for byte_rate in ['64', '128', '256']:
     reid(byte_rate, root=root, method='cosine', after=True)
     print('time', time.time()-t1, 's')
 
-with open('/nfs3-p2/zsxm/naic/rematch/train/val_list.txt', 'r') as f:
+with open(os.path.join(root, 'val_list.txt'), 'r') as f:
     lines = f.readlines()
 file_to_label = {}
 for line in lines:
@@ -140,7 +140,7 @@ for byte_rate in ['64', '128', '256']:
 #     return ACC_reid, acc1, mAP
 
 
-# with open('/nfs3-p2/zsxm/naic/rematch/train/val_list.txt', 'r') as f:
+# with open(os.path.join(root, 'val_list.txt'), 'r') as f:
 #     lines = f.readlines()
 # file_to_label = {}
 # for line in lines:
