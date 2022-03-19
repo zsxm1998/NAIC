@@ -249,7 +249,6 @@ class AETrainer(BaseTrainer):
                     features_t = torch.from_numpy(features).to(self.device)
                     dists = torch.mm(features_t, features_t.T)
                     ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
-                    del features_t
                 except RuntimeError as e:
                     self.eval_on_gpu = False
                     self.logger.info(f'Except [{e}], change eval_on_gpu to False')
@@ -257,6 +256,8 @@ class AETrainer(BaseTrainer):
                     ranks = np.argsort(-dists, axis=1)
                 finally:
                     del dists, features
+                    if 'features_t' in locals():
+                        del features_t
             else:
                 dists = np.matmul(features, features.T)
                 ranks = np.argsort(-dists, axis=1)

@@ -300,7 +300,6 @@ class EndToEndTrainer(BaseTrainer):
                 features_reco_t = torch.from_numpy(features_reco).to(self.device)
                 dists = torch.mm(features_reco_t, features_t.T)
                 ranks = torch.argsort(dists, dim=1, descending=True).cpu().numpy()
-                del features_t, features_reco_t
             except RuntimeError as e:
                 self.eval_on_gpu = False
                 self.logger.info(f'Except [{e}], change eval_on_gpu to False')
@@ -308,6 +307,10 @@ class EndToEndTrainer(BaseTrainer):
                 ranks = np.argsort(-dists, axis=1)
             finally:
                 del dists, features, features_reco
+                if 'features_t' in locals():
+                    del features_t
+                if 'features_reco_t' in locals():
+                    del features_t
         else:
             dists = np.matmul(features_reco, features.T)
             ranks = np.argsort(-dists, axis=1)
