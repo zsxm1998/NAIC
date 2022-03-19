@@ -1,8 +1,8 @@
-info: 提取，efficientnet_b4输出256维，ColorJitter，SupCon，删除数据集重复图片，使用自然图像预训练，然后在迁移比赛数据集上训练，第一阶段
-model_name: efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')
+info: 提取，efficientnet_b4输出256维，ColorJitter，SupCon，删除数据集重复图片，使用自然图像预训练，然后在迁移比赛数据集上训练，第二阶段
+model_name: efficientnet_b4(num_classes={})
 feature_dim: 256
 device: 1
-epochs: 20
+epochs: 120
 early_stopping: 0
 batch_size: 128
 lr: 0.00035
@@ -12,10 +12,10 @@ warmup_iters: 10
 milestones: [30, 55]
 gamma: 0.1
 warmup_factor: 0.01
-source: /nfs3-p2/zsxm/naic/rematch/otherdata/origin
+source: /disk1/zsxm/datasets/naic/multidataset_trans
 eval_on_gpu: True
 save_cp: false
 start_epoch: 0
-load_model: False
+load_model: /nfs3-p1/zsxm/naic/rematch/pretrained_models/ori_data_pretrained.pth
 load_optimizer: False
 load_scheduler: False
