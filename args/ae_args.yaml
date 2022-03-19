@@ -1,4 +1,4 @@
-info: 三个线性AE，efficientnet_b4输出1024维，增加迁移数据集
+info: 三个线性AE，efficientnet_b4输出1024维，增加自然数据集
 model_name: efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')
 feature_dim: 1024
 compress_dim: 32
@@ -12,7 +12,7 @@ milestones: [30, 55]
 gamma: 0.1
 warmup_factor: 0.01
 warmup_iters: 10
-source: /nfs3-p2/zsxm/naic/rematch/multidataset_trans
+source: /disk1/zsxm/datasets/naic/multidataset
 eval_on_gpu: False
 save_cp: false
 start_epoch: 0
