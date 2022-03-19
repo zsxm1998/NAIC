@@ -82,7 +82,7 @@ def reconstruct(bytes_rate, root=''):
     reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
-    featuredataset = FeatureDataset(compressed_query_fea_dir, float)
+    featuredataset = FeatureDataset(compressed_query_fea_dir)
     normal = featuredataset.normal
     featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE if normal else ABNORMAL_BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
