@@ -3,9 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from math import log2
 
-from .backbones.efficientnet import efficientnet_b4, efficientnet_b5
-from .backbones.resnet import resnet50
-from .backbones.resnet_nl import resnet50_nl
+from .efficientnet import efficientnet_b4, efficientnet_b5
 
 
 def weights_init_kaiming(m):
