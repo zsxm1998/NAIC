@@ -10,6 +10,7 @@ from .ae import AEModel
 
 DIM_NUM = 1024
 BATCH_SIZE = 512
+NORMAL_COUNT = 30000
 
 
 def get_file_basename(path: str) -> str:
@@ -23,32 +24,39 @@ def write_feature_file(fea: np.ndarray, path: str):
 
 
 class FeatureDataset(Dataset):
-    def __init__(self, file_dir, data_type=float):
+    def __init__(self, file_dir):
         self.query_fea_paths = glob.glob(os.path.join(file_dir, '*.*'))
-        self.data_type = data_type
+        self.normal = len(self.query_fea_paths) != NORMAL_COUNT
 
     def __len__(self):
         return len(self.query_fea_paths)
 
     def __getitem__(self, index):
-        if self.data_type == float:
+        if self.normal:
             vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<f2')).float()
-        elif self.data_type == int:
-            vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype='<i2'))
         else:
-            raise ValueError(f'data_type wrong:{self.data_type}')
+            vector = torch.from_numpy(np.fromfile(self.query_fea_paths[index], dtype=np.int16))
         basename = os.path.splitext(os.path.basename(self.query_fea_paths[index]))[0]
         return vector, basename
 
 
-def abnormal_reconstruct(compressed_query_fea_dir, reconstructed_query_fea_dir, basenames, code_dict, bytes_rate):
-    pass
+def abnormal_reconstruct(root, reconstructed_query_fea_dir, bytes_rate, featureloader):
+    # load code dictionary
+    block_size = 2048 // (bytes_rate // 2)
+    codebook = torch.from_numpy(np.load(os.path.join(root, f'project/gen_final_big_65400x{block_size}.npy')))
+    for vector, basename in featureloader:
+        for i, bname in enumerate(basename):
+            compessed_fea = vector[i].int()
+            reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
+            idx = compessed_fea + 32768 # int16 -> int
+            reconstructed_fea = np.zeros(2048, dtype=np.float32)
+            for j in range(0, 2048, block_size):
+                reconstructed_fea[j:j + block_size] = codebook[idx[j // block_size], :].numpy()
+            write_feature_file(reconstructed_fea, reconstructed_fea_path)
 
 
 @torch.no_grad()
-def normal_reconstruct(root, compressed_query_fea_dir, reconstructed_query_fea_dir, bytes_rate):
-    featuredataset = FeatureDataset(compressed_query_fea_dir, float)
-    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+def normal_reconstruct(root, reconstructed_query_fea_dir, bytes_rate, featureloader):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     ae_net = AEModel('efficientnet_b4(num_classes={})', extractor_out_dim=DIM_NUM, compress_dim=32)
     ae_net.load_param(os.path.join(root, f'project/Net_best.pth'))
@@ -73,14 +81,17 @@ def reconstruct(bytes_rate, root=''):
     reconstructed_query_fea_dir = os.path.join(root, 'reconstructed_query_feature/{}'.format(bytes_rate))
     os.makedirs(reconstructed_query_fea_dir, exist_ok=True)
 
-    normal = len(glob.glob(os.path.join(compressed_query_fea_dir, '*.*'))) != 30000
+    featuredataset = FeatureDataset(compressed_query_fea_dir, float)
+    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+
+    normal = featuredataset.normal
 
     # normal cases
     if normal:
-        normal_reconstruct(root, compressed_query_fea_dir, reconstructed_query_fea_dir, bytes_rate)
+        normal_reconstruct(root, reconstructed_query_fea_dir, bytes_rate, featureloader)
 
     # abnormal cases
     if not normal:
-        pass
+        abnormal_reconstruct(root, reconstructed_query_fea_dir, bytes_rate, featureloader)
 
     print('Reconstruction Done')

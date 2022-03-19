@@ -11,10 +11,12 @@ from .ae import AEModel
 
 DIM_NUM = 1024
 BATCH_SIZE = 512
+NORMAL_COUNT = 30000
 
 class FeatureDataset(Dataset):
     def __init__(self, file_dir):
         self.query_fea_paths = glob.glob(os.path.join(file_dir, '*.*'))
+        self.normal = len(self.query_fea_paths) != NORMAL_COUNT
 
     def __len__(self):
         return len(self.query_fea_paths)
@@ -25,8 +27,36 @@ class FeatureDataset(Dataset):
         return vector, basename
 
 
-def abnormal_compress(compressed_query_fea_dir, vectors, basenames, gpu_index, bytes_rate):
-    pass
+def batch_dr(a, b):
+    c = torch.pow(( a.unsqueeze(1) - b ), 2) # [a, b, d]
+    d = torch.sum(c, dim=2)
+    return d
+
+
+def knn(query_features, codebook, block_size, device):
+    nq, nd = query_features.shape
+    best_idx = torch.zeros(nq, nd//block_size).to(torch.int16)
+
+    loss_part = torch.zeros((nq, 1)).to(device)
+    for j in range(0, nd, block_size):
+        query_feature_block = query_features[:, j:j+block_size]
+        dist = batch_dr(query_feature_block, codebook)
+        val, ind = torch.topk(-dist, k=1, dim=1)
+        best_idx[:, j // block_size] = ind[:, 0] - 32768 # int16 instead of uin16
+    return best_idx
+
+
+def abnormal_compress(root, compressed_query_fea_dir, bytes_rate, featureloader):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    block_size = 2048 // (bytes_rate // 2)
+    codebook = torch.from_numpy(np.load(os.path.join(root, f'project/gen_final_big_65400x{block_size}.npy'))).to(device)
+    for vector, basename in featureloader:
+        vector = vector.to(device)
+        idx = knn(query_features=vector, codebook=codebook, block_size=block_size, device=device)
+        # write to file
+        for i, bname in enumerate(basename):
+            compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+            idx[i].cpu().numpy().astype(np.int16).tofile(compressed_fea_path)
 
 
 @torch.no_grad()
@@ -55,7 +85,7 @@ def compress(bytes_rate, root=''):
     featuredataset = FeatureDataset(query_fea_dir)
     featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
-    normal = len(featuredataset) != 30000
+    normal = featuredataset.normal
 
     # normal cases
     if normal:
@@ -63,6 +93,6 @@ def compress(bytes_rate, root=''):
 
     # abnormal cases
     if not normal:
-        pass
+        abnormal_compress(root, compressed_query_fea_dir, bytes_rate, featureloader)
 
     print('Compression Done')

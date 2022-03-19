@@ -1,7 +1,7 @@
-from project_ol.extract import extract
-from project_ol.compress import compress
-from project_ol.reconstruct import reconstruct
-from project_ol.reid import reid
+from project_3.extract import extract
+from project_3.compress import compress
+from project_3.reconstruct import reconstruct
+from project_3.reid import reid
 
 import os
 import torch
@@ -13,51 +13,52 @@ import time
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 root = '/nfs3-p1/zsxm/naic/rematch/test'
-DIM_NUM = 180
+DIM_NUM = 1024
 
+# t1 = time.time()
 # extract(root=root)
+# print('time', time.time()-t1, 's')
 # os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
 
-for byte_rate in ['64', '128', '256']:
-    t1 = time.time()
-    compress(byte_rate, root=root)
-    print('time', time.time()-t1, 's')
+
+# for byte_rate in ['64', '128', '256']:
+#     t1 = time.time()
+#     compress(byte_rate, root=root)
+#     print('time', time.time()-t1, 's')
+
+# for byte_rate in ['64', '128', '256']:
+#     t1 = time.time()
+#     reconstruct(byte_rate, root=root)
+#     print('time', time.time()-t1, 's')
+
+# class L2ReconstructionLoss(nn.Module):
+#     def __init__(self):
+#         super(L2ReconstructionLoss, self).__init__()
+
+#     def forward(self, reconstructed, origin):
+#         assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
+#         return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
+
+# file_list = sorted(os.listdir(os.path.join(root, 'query_feature')))
+# feature_list = []
+# for file in file_list:
+#     feature_list.append(np.fromfile(os.path.join(root, 'query_feature', file), dtype='<f4')[:DIM_NUM])
+# features = torch.from_numpy(np.stack(feature_list, axis=0))
+# del feature_list
+# for byte_rate in ['64', '128', '256']:
+#     reconstruct_feature_list = []
+#     for file in file_list:
+#         reconstruct_feature_list.append(np.fromfile(os.path.join(root, 'reconstructed_query_feature', byte_rate, file), dtype='<f4')[:DIM_NUM])
+#     reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
+#     del reconstruct_feature_list
+#     print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
+
+
 
 for byte_rate in ['64', '128', '256']:
     t1 = time.time()
-    reconstruct(byte_rate, root=root)
-    print('time', time.time()-t1, 's')
-
-
-
-class L2ReconstructionLoss(nn.Module):
-    def __init__(self):
-        super(L2ReconstructionLoss, self).__init__()
-
-    def forward(self, reconstructed, origin):
-        assert reconstructed.shape == origin.shape, f'reconstructed.shape({reconstructed.shape}) should be equal to origin.shape({origin.shape})'
-        return torch.linalg.norm(reconstructed-origin, dim=1, ord=2).mean()
-
-file_list = sorted(os.listdir(os.path.join(root, 'query_feature')))
-feature_list = []
-for file in file_list:
-    feature_list.append(np.fromfile(os.path.join(root, 'query_feature', file), dtype='<f4')[:DIM_NUM])
-features = torch.from_numpy(np.stack(feature_list, axis=0))
-del feature_list
-for byte_rate in ['64', '128', '256']:
-    reconstruct_feature_list = []
-    for file in file_list:
-        reconstruct_feature_list.append(np.fromfile(os.path.join(root, 'reconstructed_query_feature', byte_rate, file), dtype='<f4')[:DIM_NUM])
-    reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
-    del reconstruct_feature_list
-    print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
-
-
-
-for byte_rate in ['64', '128', '256']:
-    t1 = time.time()
-    reid(byte_rate, root=root, method='rerank_l2')
+    reid(byte_rate, root=root, method='rerank_l2', after=True)
     print('time', time.time()-t1, 's')
 
 with open('/nfs3-p2/zsxm/naic/rematch/train/val_list.txt', 'r') as f:
