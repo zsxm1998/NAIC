@@ -97,7 +97,11 @@ class AEModel(nn.Module):
         i = int(log2(byte_rate//self.byte_rate_base))
         return self.decoders[i](feas)
 
-    def reid(self, feas, byte_rate):
+    def ae(self, feas, byte_rate):
+        i = int(log2(byte_rate//self.byte_rate_base))
+        return self.decoders[i](self.encoders[i](feas))
+
+    def bn(self, feas, byte_rate):
         i = int(log2(byte_rate//self.byte_rate_base))
         return self.bottlenecks[i](feas)
 
