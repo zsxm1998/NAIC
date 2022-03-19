@@ -91,7 +91,7 @@ class AEModel(nn.Module):
 
     def compress(self, feas, byte_rate):
         i = int(log2(byte_rate//self.byte_rate_base))
-        return self.encoders[i](feas).half()
+        return self.encoders[i](feas)
 
     def reconstract(self, feas, byte_rate):
         i = int(log2(byte_rate//self.byte_rate_base))
