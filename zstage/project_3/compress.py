@@ -11,6 +11,7 @@ from .ae import AEModel
 
 DIM_NUM = 1024
 BATCH_SIZE = 512
+ABNORMAL_BATCH_SIZE = 64
 NORMAL_COUNT = 30000
 
 class FeatureDataset(Dataset):
@@ -83,9 +84,8 @@ def compress(bytes_rate, root=''):
     os.makedirs(compressed_query_fea_dir, exist_ok=True)
 
     featuredataset = FeatureDataset(query_fea_dir)
-    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
-
     normal = featuredataset.normal
+    featureloader = DataLoader(featuredataset, batch_size=BATCH_SIZE if normal else ABNORMAL_BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
     # normal cases
     if normal:

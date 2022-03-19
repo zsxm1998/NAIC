@@ -58,7 +58,7 @@ DIM_NUM = 1024
 
 for byte_rate in ['64', '128', '256']:
     t1 = time.time()
-    reid(byte_rate, root=root, method='rerank_l2', after=True)
+    reid(byte_rate, root=root, method='cosine', after=True)
     print('time', time.time()-t1, 's')
 
 with open('/nfs3-p2/zsxm/naic/rematch/train/val_list.txt', 'r') as f:
