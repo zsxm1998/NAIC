@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import six
 
-DIM_NUM = 180
+DIM_NUM = 256
 BATCH_SIZE = 512
 ABNORMAL_BATCH_SIZE = 64
 NORMAL_COUNT = 30000
@@ -50,7 +50,7 @@ def knn(query_features, codebook, block_size, device):
 def abnormal_compress(root, compressed_query_fea_dir, bytes_rate, featureloader):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     block_size = 2048 // (bytes_rate // 2)
-    codebook = torch.from_numpy(np.load(os.path.join(root, f'project/gen_final_big_65400x{block_size}.npy'))).to(device)
+    codebook = torch.from_numpy(np.load(os.path.join(root, f'project/gen_shifted_65536x{block_size}.npy'))).to(device)
     for vector, basename in featureloader:
         vector = vector.to(device)
         idx = knn(query_features=vector, codebook=codebook, block_size=block_size, device=device)
@@ -69,53 +69,47 @@ def find_nearest(array,value):
 
 
 def huffman_compress(root, compressed_query_fea_dir, bytes_rate, featureloader):
-    if bytes_rate != 256:
-        huffman_dict = torch.load(os.path.join(root, f'project/huffman_128_len_len_1.pth'))
-        forward = huffman_dict[f'for{bytes_rate}']
-        nums = huffman_dict[f'nums{bytes_rate}']
-        for vectors, basenames in featureloader:
-            vectors = vectors[:, :DIM_NUM]
-            for vector, bname in zip(vectors, basenames):
-                compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                output_len = 0
-                code = ''
-                with open(compressed_fea_path, 'wb') as f:
-                    for extract_num in vector:
-                        extract_num = float(extract_num)
-                        closest_num = find_nearest(nums, extract_num)
-                        code = code + forward[closest_num]
-                    out = 0
-                    while len(code) > 8 and output_len < bytes_rate:
-                        for x in range(8):
-                            out = out << 1
-                            if code[x] == '1':
-                                out = out | 1
-                        code = code[8:]
-                        f.write(six.int2byte(out))
-                        output_len += 1
-                        out = 0
-                    # 处理剩下来的不满8位的code
-                    out = 0
-                    for i in range(len(code)):
+    huffman_dict = torch.load(os.path.join(root, f'project/huffman_256_before_bn_len_len_len.pth'))
+    forward = huffman_dict[f'for{bytes_rate}']
+    nums = huffman_dict[f'nums{bytes_rate}']
+    for vectors, basenames in featureloader:
+        vectors = vectors[:, :DIM_NUM]
+        for vector, bname in zip(vectors, basenames):
+            compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+            output_len = 0
+            code = ''
+            with open(compressed_fea_path, 'wb') as f:
+                for extract_num in vector:
+                    extract_num = float(extract_num)
+                    closest_num = find_nearest(nums, extract_num)
+                    code = code + forward[closest_num]
+                out = 0
+                while len(code) > 8 and output_len < bytes_rate:
+                    for x in range(8):
                         out = out << 1
-                        if code[i]=='1':
+                        if code[x] == '1':
                             out = out | 1
-                    for i in range(8 - len(code)):
-                        out = out << 1
-                    # 把最后一位给写入到文件当中
-                    if output_len < bytes_rate:
-                        f.write(six.int2byte(out))
-                        output_len += 1
-                    # 补成一样长度
-                    while output_len < bytes_rate:
-                        f.write(six.int2byte(0))
-                        output_len += 1
-    else:
-        for vectors, basenames in featureloader:
-            vectors = vectors[:, :DIM_NUM]
-            for vector, bname in zip(vectors, basenames):
-                compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                vector.numpy().astype('<f2').tofile(compressed_fea_path)
+                    code = code[8:]
+                    f.write(six.int2byte(out))
+                    output_len += 1
+                    out = 0
+                # 处理剩下来的不满8位的code
+                out = 0
+                for i in range(len(code)):
+                    out = out << 1
+                    if code[i]=='1':
+                        out = out | 1
+                for i in range(8 - len(code)):
+                    out = out << 1
+                # 把最后一位给写入到文件当中
+                if output_len < bytes_rate:
+                    f.write(six.int2byte(out))
+                    output_len += 1
+                # 补成一样长度
+                while output_len < bytes_rate:
+                    f.write(six.int2byte(0))
+                    output_len += 1
+                    
 
 @torch.no_grad()
 def compress(bytes_rate, root=''):

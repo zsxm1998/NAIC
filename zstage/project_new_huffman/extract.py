@@ -9,9 +9,9 @@ from torchvision import transforms as T
 import torch.nn as nn
 import torch.nn.functional as F
 
-from extractor import ExtractorModel
+from .extractor import ExtractorModel
 
-DIM_NUM = 180
+DIM_NUM = 256
 BATCH_SIZE = 128
 
 
@@ -54,7 +54,7 @@ def extract(root='', after=True):
 
     dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=BATCH_SIZE, num_workers=8)
-    ex_net = ExtractorModel(model_name='efficientnet_b5(num_classes={})', extractor_out_dim=DIM_NUM)
+    ex_net = ExtractorModel(model_name='efficientnet_b4(num_classes={})', extractor_out_dim=DIM_NUM)
     ex_net.load_param(os.path.join(root, f'project/Net_best.pth'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     ex_net.to(device)

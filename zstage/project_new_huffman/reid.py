@@ -6,9 +6,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-DIM_NUM = 180
+DIM_NUM = 256
+BATCH_SIZE = 512
+L2_BATCH_SIZE = 20
 WEIGHT = [0.02, 0.56, 0.24, 0.1, 0.02, 0.01, 0.02, 0.02, 0.02]
-# WEIGHT = [0.3, 0.6, 0.1]
+
 
 def read_feature_file(path: str) -> np.ndarray:
     return np.fromfile(path, dtype='<f4')[:DIM_NUM]
@@ -69,7 +71,7 @@ def reid(bytes_rate, root='', method='rerank_l2'):
                  'rerank_pearson': pearson_similarity,
                  'rerank_l2': l2_dist,
                 }
-    batch_size = 50 if 'l2' in method else 512
+    batch_size = L2_BATCH_SIZE if 'l2' in method else BATCH_SIZE
     result_dict = {}
     for i in range(0, len(query_names), batch_size):
         j = min(i+batch_size, len(query_names))

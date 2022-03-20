@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-DIM_NUM = 180
+DIM_NUM = 256
 BATCH_SIZE = 512
 ABNORMAL_BATCH_SIZE = 64
 NORMAL_COUNT = 30000
@@ -41,7 +41,7 @@ class FeatureDataset(Dataset):
 def abnormal_reconstruct(root, reconstructed_query_fea_dir, bytes_rate, featureloader):
     # load code dictionary
     block_size = 2048 // (bytes_rate // 2)
-    codebook = torch.from_numpy(np.load(os.path.join(root, f'project/gen_final_big_65400x{block_size}.npy')))
+    codebook = torch.from_numpy(np.load(os.path.join(root, f'project/gen_shifted_65536x{block_size}.npy')))
     for vector, basename in featureloader:
         for i, bname in enumerate(basename):
             compessed_fea = vector[i].int()
@@ -54,46 +54,35 @@ def abnormal_reconstruct(root, reconstructed_query_fea_dir, bytes_rate, featurel
 
 
 def huffman_reconstruct(root, compressed_query_fea_dir, reconstructed_query_fea_dir, bytes_rate, featureloader):
-    if bytes_rate != 256:
-        huffman_dict = torch.load(os.path.join(root, f'project/huffman_128_len_len_1.pth'))
-        reverse = huffman_dict[f'rev{bytes_rate}']
-        nums = huffman_dict[f'nums{bytes_rate}']
-        for vector, basenames in featureloader:
-            # huffman_reconstruct(compressed_query_fea_dir, reconstructed_query_fea_dir, basename, reverse, nums, bytes_rate)
-            for bname in basenames:
-                compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
-                reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
-                with open(compressed_fea_path, 'rb') as f:
-                    feature_len = 2048
-                    fea = np.zeros(feature_len, dtype='<f4')
-                    filedata = f.read()
-                    filesize = f.tell()
-                idx = 0
-                code = ''
-                for x in range(0, filesize):
-                    #python3
-                    c = filedata[x]
-                    for i in range(8):
-                        if c & 128:
-                            code = code + '1'
-                        else:
-                            code = code + '0'
-                        c = c << 1
-                        if code in reverse:
-                            fea[idx] = reverse[code]
-                            idx = idx + 1
-                            code = ''
-                fea.tofile(reconstructed_fea_path)
-    else:
-        for vector, basename in featureloader:
-            reconstructed = vector
-            expand_r = torch.zeros(reconstructed.shape[0], 2048, dtype=reconstructed.dtype)
-            expand_r[:, :DIM_NUM] = reconstructed
-            expand_r = expand_r.numpy().astype('<f4')
-
-            for b, bname in enumerate(basename):
-                reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
-                expand_r[b].tofile(reconstructed_fea_path)
+    huffman_dict = torch.load(os.path.join(root, f'project/huffman_256_before_bn_len_len_len.pth'))
+    reverse = huffman_dict[f'rev{bytes_rate}']
+    nums = huffman_dict[f'nums{bytes_rate}']
+    for vector, basenames in featureloader:
+        # huffman_reconstruct(compressed_query_fea_dir, reconstructed_query_fea_dir, basename, reverse, nums, bytes_rate)
+        for bname in basenames:
+            compressed_fea_path = os.path.join(compressed_query_fea_dir, bname + '.dat')
+            reconstructed_fea_path = os.path.join(reconstructed_query_fea_dir, bname + '.dat')
+            with open(compressed_fea_path, 'rb') as f:
+                feature_len = 2048
+                fea = np.zeros(feature_len, dtype='<f4')
+                filedata = f.read()
+                filesize = f.tell()
+            idx = 0
+            code = ''
+            for x in range(0, filesize):
+                #python3
+                c = filedata[x]
+                for i in range(8):
+                    if c & 128:
+                        code = code + '1'
+                    else:
+                        code = code + '0'
+                    c = c << 1
+                    if code in reverse:
+                        fea[idx] = reverse[code]
+                        idx = idx + 1
+                        code = ''
+            fea.tofile(reconstructed_fea_path)
 
 
 @torch.no_grad()
