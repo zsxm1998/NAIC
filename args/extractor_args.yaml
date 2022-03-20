@@ -1,7 +1,7 @@
 info: 提取，efficientnet_b4输出256维，ColorJitter，SupCon，删除数据集重复图片，使用自然图像预训练，然后在迁移比赛数据集上训练，第二阶段
 model_name: efficientnet_b4(num_classes={})
 feature_dim: 256
-device: 1
+device: 0
 epochs: 120
 early_stopping: 0
 batch_size: 128

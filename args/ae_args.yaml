@@ -1,8 +1,8 @@
-info: 三个线性AE，efficientnet_b4输出1024维，增加自然数据集
-model_name: efficientnet_b4(num_classes={}, pretrained='.details/checkpoints/efficientnet_b4.pth')
+info: 三个线性AE，efficientnet_b4输出1024维，增加自然数据集，换GPU继续训练
+model_name: efficientnet_b4(num_classes={})
 feature_dim: 1024
 compress_dim: 32
-device: 2
+device: 1
 epochs: 120
 early_stopping: 0
 batch_size: 64
@@ -15,7 +15,7 @@ warmup_iters: 10
 source: /disk1/zsxm/datasets/naic/multidataset
 eval_on_gpu: False
 save_cp: false
-start_epoch: 0
-load_model: False
-load_optimizer: False
-load_scheduler: False
+start_epoch: 26
+load_model: .details/checkpoints/AE/03-19_03:40:13/Net_best.pth
+load_optimizer: .details/checkpoints/AE/03-19_03:40:13/Optimizer_last.pth
+load_scheduler: .details/checkpoints/AE/03-19_03:40:13/Scheduler_last.pth

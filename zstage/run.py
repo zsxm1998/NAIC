@@ -1,7 +1,7 @@
-from project_3.extract import extract
-from project_3.compress import compress
-from project_3.reconstruct import reconstruct
-from project_3.reid import reid
+from project_huffman.extract import extract
+from project_huffman.compress import compress
+from project_huffman.reconstruct import reconstruct
+from project_huffman.reid import reid
 
 import os
 import torch
@@ -11,14 +11,14 @@ import torch.nn.functional as F
 import json
 import time
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-root = '/nfs3-p1/zsxm/naic/rematch/test'
-DIM_NUM = 1024
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+root = '/nfs3-p2/zsxm/naic/rematch/test_huffman'
+DIM_NUM = 180
 
-# t1 = time.time()
-# extract(root=root)
-# print('time', time.time()-t1, 's')
-# os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
+t1 = time.time()
+extract(root=root)
+print('time', time.time()-t1, 's')
+os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
 
 
@@ -56,42 +56,42 @@ DIM_NUM = 1024
 
 
 
-for byte_rate in ['64', '128', '256']:
-    t1 = time.time()
-    reid(byte_rate, root=root, method='cosine', after=True)
-    print('time', time.time()-t1, 's')
+# for byte_rate in ['64', '128', '256']:
+#     t1 = time.time()
+#     reid(byte_rate, root=root, method='cosine', after=True)
+#     print('time', time.time()-t1, 's')
 
-with open(os.path.join(root, 'val_list.txt'), 'r') as f:
-    lines = f.readlines()
-file_to_label = {}
-for line in lines:
-    fname, label = line.split()[:2]
-    fname = fname.split('.')[0]+'.png'
-    label = int(label)
-    file_to_label[fname] = label
-for byte_rate in ['64', '128', '256']:
-    with open(os.path.join(root, f'reid_results/{byte_rate}.json'), 'r') as jf:
-        res = json.load(jf)
-    acc1, mAP = 0, 0
-    for k, v in res.items():
-        ap = 0
-        label = file_to_label[k]
-        rank_label = np.array([file_to_label[fn] for fn in v if fn != k])
-        if rank_label[0] == label:
-            acc1 += 1 
-        correct_rank_idx = np.argwhere(rank_label==label).flatten()
-        correct_rank_idx = correct_rank_idx[correct_rank_idx<100]
-        n_correct = len(correct_rank_idx)
-        if n_correct > 0:
-            d_recall = 1 / n_correct
-            for j in range(n_correct):
-                precision = (j+1) / (correct_rank_idx[j]+1)
-                ap += d_recall * precision
-        mAP += ap
-    acc1 /= len(res)
-    mAP /= len(res)
-    ACC_reid = (acc1 + mAP) / 2
-    print(f'{byte_rate}', ACC_reid, acc1, mAP)
+# with open(os.path.join(root, 'val_list.txt'), 'r') as f:
+#     lines = f.readlines()
+# file_to_label = {}
+# for line in lines:
+#     fname, label = line.split()[:2]
+#     fname = fname.split('.')[0]+'.png'
+#     label = int(label)
+#     file_to_label[fname] = label
+# for byte_rate in ['64', '128', '256']:
+#     with open(os.path.join(root, f'reid_results/{byte_rate}.json'), 'r') as jf:
+#         res = json.load(jf)
+#     acc1, mAP = 0, 0
+#     for k, v in res.items():
+#         ap = 0
+#         label = file_to_label[k]
+#         rank_label = np.array([file_to_label[fn] for fn in v if fn != k])
+#         if rank_label[0] == label:
+#             acc1 += 1 
+#         correct_rank_idx = np.argwhere(rank_label==label).flatten()
+#         correct_rank_idx = correct_rank_idx[correct_rank_idx<100]
+#         n_correct = len(correct_rank_idx)
+#         if n_correct > 0:
+#             d_recall = 1 / n_correct
+#             for j in range(n_correct):
+#                 precision = (j+1) / (correct_rank_idx[j]+1)
+#                 ap += d_recall * precision
+#         mAP += ap
+#     acc1 /= len(res)
+#     mAP /= len(res)
+#     ACC_reid = (acc1 + mAP) / 2
+#     print(f'{byte_rate}', ACC_reid, acc1, mAP)
 
 
 

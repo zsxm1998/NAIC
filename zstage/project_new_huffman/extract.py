@@ -9,7 +9,7 @@ from torchvision import transforms as T
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .efficientnet import efficientnet_b4, efficientnet_b5
+from extractor import ExtractorModel
 
 DIM_NUM = 180
 BATCH_SIZE = 128
@@ -41,7 +41,7 @@ class ImageDataset(Dataset):
         return img, basename
 
 @torch.no_grad()
-def extract(root=''):
+def extract(root='', after=True):
     img_dir = os.path.join(root, 'image')
     fea_dir = os.path.join(root, 'feature')
     os.makedirs(fea_dir, exist_ok=True)
@@ -54,14 +54,14 @@ def extract(root=''):
 
     dataset = ImageDataset(img_dir, transform=transform)
     dataloader = DataLoader(dataset, shuffle=False, batch_size=BATCH_SIZE, num_workers=8)
-    extractor = efficientnet_b4(num_classes=DIM_NUM)
-    extractor.load_state_dict(torch.load(os.path.join(root, f'project/Extractor_{DIM_NUM}_best.pth')))
+    ex_net = ExtractorModel(model_name='efficientnet_b5(num_classes={})', extractor_out_dim=DIM_NUM)
+    ex_net.load_param(os.path.join(root, f'project/Net_best.pth'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    extractor.to(device)
-    extractor.eval()
+    ex_net.to(device)
+    ex_net.eval()
     for imgs, basenames in dataloader:
         imgs = imgs.to(device)
-        features = extractor(imgs)
+        features = ex_net.extract(imgs, after=after)
         features = features.cpu()
         zfeatrues = torch.zeros(features.shape[0], 2048, dtype=features.dtype)
         zfeatrues[:, :DIM_NUM] = features

@@ -80,7 +80,7 @@ class ExtractorTrainer(BaseTrainer):
                                      num_workers=8, 
                                      pin_memory=True)
 
-        self.net = ExtractorModel(opt.model_name, id_num=len(self.train_dataset.pids), extractor_out_dim=opt.feature_dim)
+        self.net = ExtractorModel(opt.model_name, extractor_out_dim=opt.feature_dim, id_num=len(self.train_dataset.pids))
         if opt.load_model:
             try:
                 self.net.load_state_dict(torch.load(opt.load_model))

@@ -215,6 +215,8 @@ def compress(bytes_rate, root=''):
         model = AE(io_dim=2048, hidden_dim=bytes_rate//2)
         model.load_state_dict(torch.load(os.path.join(root, 'project/ae_{}.pth'.format(bytes_rate//2))))
         model.to(device)
+        for p in model.decoder.parameters():
+            p.requires_grad = False
 
         data_loader = load_data(query_fea_dir)
 
