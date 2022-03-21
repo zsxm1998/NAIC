@@ -1,9 +1,10 @@
-from project_huffman.extract import extract
-from project_huffman.compress import compress
-from project_huffman.reconstruct import reconstruct
-from project_huffman.reid import reid
+from project_new_huffman.extract import extract
+from project_new_huffman.compress import compress
+from project_new_huffman.reconstruct import reconstruct
+from project_new_huffman.reid import reid
 
 import os
+import shutil
 import torch
 from torch import nn
 import numpy as np
@@ -13,11 +14,13 @@ import time
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 root = '/nfs3-p2/zsxm/naic/rematch/test_huffman'
-DIM_NUM = 180
+DIM_NUM = 256
 
 t1 = time.time()
 extract(root=root)
 print('time', time.time()-t1, 's')
+if os.path.exists(os.path.join(root, 'query_feature')) and len(os.listdir(os.path.join(root, 'feature'))) == len(os.listdir(os.path.join(root, 'query_feature'))):
+    shutil.rmtree(os.path.join(root, 'query_feature'))
 os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 
 
@@ -53,12 +56,20 @@ os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 #     reconstruct_features = torch.from_numpy(np.stack(reconstruct_feature_list, axis=0))
 #     del reconstruct_feature_list
 #     print(f'byte_rate {byte_rate} L2 loss:', L2ReconstructionLoss()(reconstruct_features, features).item())
+# # after 结果
+# # byte_rate 64 L2 loss: 33.741424560546875
+# # byte_rate 128 L2 loss: 11.428487777709961
+# # byte_rate 256 L2 loss: 6.640642166137695
+# # before 结果
+# # byte_rate 64 L2 loss: 1.1510790586471558
+# # byte_rate 128 L2 loss: 0.3566276729106903
+# # byte_rate 256 L2 loss: 0.19441264867782593
 
 
 
 # for byte_rate in ['64', '128', '256']:
 #     t1 = time.time()
-#     reid(byte_rate, root=root, method='cosine', after=True)
+#     reid(byte_rate, root=root, method='cosine')
 #     print('time', time.time()-t1, 's')
 
 # with open(os.path.join(root, 'val_list.txt'), 'r') as f:
@@ -92,6 +103,16 @@ os.rename(os.path.join(root, 'feature'), os.path.join(root, 'query_feature'))
 #     mAP /= len(res)
 #     ACC_reid = (acc1 + mAP) / 2
 #     print(f'{byte_rate}', ACC_reid, acc1, mAP)
+# after 结果
+# cosine
+# 64 0.9811132230007892 0.9926154737197741 0.9696109722818043
+# 128 0.9825751811040769 0.993049857618611 0.9721005045895429
+# 256 0.9828282063561657 0.9932911820068536 0.972365230705478
+# before 结果
+# cosine
+# 64 0.9811946159917209 0.99242241420918 0.9699668177742616
+# 128 0.9827869112170977 0.993049857618611 0.9725239648155846
+# 256 0.9830635184737497 0.9933394468845022 0.9727875900629973
 
 
 
